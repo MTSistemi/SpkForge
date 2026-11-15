@@ -3,6 +3,10 @@ name: zt-syno-net
 # Builds ZeroTier One from upstream for every Synology CPU family (Intel/AMD
 # x86_64, ARM armv8 and armv7, Intel Atom i686), assembles the SPKs (one per
 # family plus a universal noarch one) and attests their build provenance.
+#
+# A tag zt-syno-net-v<zerotier version>-<build> (e.g. zt-syno-net-v1.16.2-9)
+# also publishes a GitHub Release with the SPKs, SHA256SUMS and the notes in
+# recipes/zt-syno-net/release-notes.md.
 
 on:
   workflow_dispatch:
@@ -17,6 +21,7 @@ on:
         required: true
   push:
     branches: [main]
+    tags: ['zt-syno-net-v*']
     paths:
       - 'recipes/zt-syno-net/**'
       - 'packages/spk/**'
@@ -25,11 +30,33 @@ on:
 permissions:
   contents: read
 
-env:
-  ZEROTIER_VERSION: ${{ inputs.zerotier_version || '1.16.2' }}
-  PACKAGE_BUILD: ${{ inputs.build || '1' }}
-
 jobs:
+  meta:
+    runs-on: ubuntu-24.04
+    outputs:
+      zerotier_version: ${{ steps.v.outputs.zerotier_version }}
+      build: ${{ steps.v.outputs.build }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - id: v
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.zerotier_version }}
+          INPUT_BUILD: ${{ inputs.build }}
+        run: |
+          if [ "$REF_TYPE" = tag ]; then
+            spec=${REF_NAME#zt-syno-net-v}
+            echo "$spec" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[1-9][0-9]*$' || { echo "::error::tag must be zt-syno-net-v<x.y.z>-<build>"; exit 1; }
+            version=${spec%-*}; build=${spec##*-}; release=true
+          else
+            version=${INPUT_VERSION:-1.16.2}; build=${INPUT_BUILD:-1}; release=false
+          fi
+          echo "zerotier_version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "ZeroTier $version, package build $build, release $release"
+
   test:
     runs-on: ubuntu-24.04
     steps:
@@ -41,6 +68,7 @@ jobs:
       - run: npm run check
 
   zerotier:
+    needs: meta
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -54,6 +82,8 @@ jobs:
             platform: linux/arm/v7
           - family: i686
             platform: linux/386
+    env:
+      ZEROTIER_VERSION: ${{ needs.meta.outputs.zerotier_version }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -68,12 +98,15 @@ jobs:
           if-no-files-found: error
 
   package:
-    needs: [test, zerotier]
+    needs: [meta, test, zerotier]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
       attestations: write
+    env:
+      ZEROTIER_VERSION: ${{ needs.meta.outputs.zerotier_version }}
+      PACKAGE_BUILD: ${{ needs.meta.outputs.build }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,9 +127,38 @@ jobs:
           cd dist && sha256sum *.spk | tee SHA256SUMS
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/*.spk
+          subject-path: |
+            dist/*.spk
+            dist/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: zt-syno-net-${{ env.ZEROTIER_VERSION }}-${{ env.PACKAGE_BUILD }}
           path: dist/
           if-no-files-found: error
+
+  release:
+    if: needs.meta.outputs.release == 'true'
+    needs: [meta, package]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      ZEROTIER_VERSION: ${{ needs.meta.outputs.zerotier_version }}
+      PACKAGE_BUILD: ${{ needs.meta.outputs.build }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: zt-syno-net-${{ env.ZEROTIER_VERSION }}-${{ env.PACKAGE_BUILD }}
+          path: dist
+      - name: Check the files against SHA256SUMS
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Publish the release
+        run: |
+          version="$ZEROTIER_VERSION-$PACKAGE_BUILD"
+          sed -e "s/@VERSION@/$version/g" -e "s/@ZEROTIER@/$ZEROTIER_VERSION/g" \
+            -e "s#@REPO@#$GITHUB_REPOSITORY#g" recipes/zt-syno-net/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/*.spk dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "zt-syno-net $version (ZeroTier $ZEROTIER_VERSION)" --notes-file notes.md
