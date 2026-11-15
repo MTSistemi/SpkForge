@@ -5,7 +5,12 @@ import { gunzipSync } from 'node:zlib';
 import { archMatches, parseInfo, readSpk, readTar, validateSpk } from '@spkforge/spk';
 import { buildSpk, type BuildTarget } from '../build.ts';
 import { renderIcon } from '../icon.ts';
-import { installWizard } from '../wizard.ts';
+import { installWizard, upgradeWizard, uninstallWizard, SPKFORGE_GUARD } from '../wizard.ts';
+import { guardScript, taskOperation } from '../guard.ts';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const FAKE_BINARY = new Uint8Array(64 * 1024).fill(0x7f);
 
@@ -59,7 +64,7 @@ test('payload holds executable binaries and its md5 matches INFO checksum', () =
   assert.equal(info.checksum, createHash('md5').update(tgz.data).digest('hex'));
   const payload = readTar(gunzipSync(tgz.data));
   const byName = new Map(payload.map((e) => [e.name, e]));
-  for (const name of ['bin/zerotier-one-x86_64', 'bin/zerotier-cli', 'bin/zt-syno-net-setup']) {
+  for (const name of ['bin/zerotier-one-x86_64', 'bin/zerotier-cli', 'bin/zt-syno-net-supervise', 'bin/zt-syno-net-guard']) {
     assert.equal(byName.get(name)?.mode, 0o755, name);
   }
   assert.deepEqual(new Uint8Array(byName.get('bin/zerotier-one-x86_64')!.data), FAKE_BINARY);
@@ -83,16 +88,59 @@ test('package-user scripts use no root-only tools (getcap/setcap are mode 0700 o
   const entries = readTar(build().bytes);
   const startScript = new TextDecoder().decode(entries.find((e) => e.name === 'scripts/start-stop-status')!.data);
   assert.doesNotMatch(startScript.replace(/^\s*#.*$/gm, ''), /getcap|setcap/);
-  assert.match(startScript, /caps-granted/);
+  assert.ok(startScript.includes('CAPS_MARK="/run/zt-syno-net.caps"'), 'reads the root-owned marker in /run');
   assert.match(startScript, /identity\.secret" \] && \[ ! -r /, 'must refuse to start with an unreadable identity');
 });
 
-test('setup takes the owner from the package user, not from the data directory', () => {
+test('the root guard never follows symlinks or recurses into package-owned paths', () => {
+  const guard = guardScript(SPKFORGE_GUARD);
+  assert.match(guard, /^PKG_USER="zt-syno-net"$/m);
+  assert.doesNotMatch(guard, /chown -R|cp -p|rm -rf/);
+  assert.match(guard, /plain_file\(\) \{ \[ -f "\$1" \] && \[ ! -L "\$1" \]; \}/);
+  assert.match(guard, /install -o "\$PKG_USER" -g "\$g" -m 0600 "\$old\/identity\.secret"/);
+  assert.match(guard, /chown -h /);
+  assert.match(guard, /MARK="\/run\/\$PKG\.caps"/);
+  assert.match(guard, /setcap -r/, 'removes the capability again if the file changed under it');
+  assert.ok(guard.indexOf('chmod 0700 "$d"') < guard.indexOf('setcap cap_net_admin'), 'only the package user may run the capable binary');
+});
+
+test('the boot-up task embeds the guard and stays under DSM limits', () => {
+  const op = taskOperation(SPKFORGE_GUARD);
+  assert.ok(op.length < 8192, `task command is ${op.length} characters, DSM allows 8192`);
+  assert.ok(op.includes(guardScript(SPKFORGE_GUARD).trimEnd()), 'the guard text is inside the task, not read from the package');
+  assert.match(op, /setsid \/bin\/sh \/run\/zt-syno-net-guard\.sh/);
+});
+
+test('shell scripts parse (sh -n)', { skip: spawnSync('sh', ['-c', 'exit 0']).status !== 0 && 'no sh' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'zt-sh-'));
   const tgz = readTar(build().bytes).find((e) => e.name === 'package.tgz')!;
-  const setup = new TextDecoder().decode(readTar(gunzipSync(tgz.data)).find((e) => e.name === 'bin/zt-syno-net-setup')!.data);
-  assert.match(setup, /^PKG_USER="zt-syno-net"$/m);
-  assert.doesNotMatch(setup, /stat -c '%U:%G'/);
-  assert.ok(setup.includes('chown -RH "${owner}" "${HOME_DIR}"'), '-H: HOME_DIR is a symlink to the data volume');
+  const scripts: Record<string, string> = { 'guard.sh': taskOperation(SPKFORGE_GUARD), 'guard-body.sh': guardScript(SPKFORGE_GUARD) };
+  for (const e of readTar(gunzipSync(tgz.data))) if (e.name.startsWith('bin/zt-') || e.name === 'bin/zerotier-cli') scripts[e.name.replace('bin/', '')] = new TextDecoder().decode(e.data);
+  for (const e of readTar(build().bytes)) if (e.name.startsWith('scripts/')) scripts[e.name.replace('scripts/', 'script-')] = new TextDecoder().decode(e.data);
+  for (const [name, text] of Object.entries(scripts)) {
+    const path = join(dir, name);
+    writeFileSync(path, text);
+    const r = spawnSync('sh', ['-n', path], { encoding: 'utf8' });
+    assert.equal(r.status, 0, `${name}: ${r.stderr}`);
+  }
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('wizard JavaScript is valid and wipes the password before any request', () => {
+  for (const lang of ['enu', 'ita'] as const) {
+    const install = JSON.parse(installWizard(lang));
+    const step = install[1];
+    for (const [key, body] of [['create', step.deactivate_v2], ['delete', JSON.parse(uninstallWizard(lang))[0].deactivate_v2]] as const) {
+      assert.doesNotThrow(() => new Function(`return function${body}`), `${lang} ${key}`);
+    }
+    const body = step.deactivate_v2 as string;
+    assert.ok(body.indexOf("pwField.setValue('')") < body.indexOf('var request'), 'password cleared before any request is built');
+    assert.match(body, /SYNO\.Core\.EventScheduler\.Root/);
+    assert.match(body, /SYNO\.Core\.User\.PasswordConfirm/);
+    const keys = step.items.flatMap((i: { subitems?: { key: string }[] }) => (i.subitems ?? []).map((s) => s.key));
+    assert.deepEqual(keys, ['zt_create_task', 'zt_admin_password', 'zt_status']);
+    assert.equal(JSON.parse(upgradeWizard(lang))[0].deactivate_v2, body);
+  }
 });
 
 test('firewall rule lives inside the payload, where conf/resource points', () => {
@@ -112,12 +160,12 @@ test('builds are reproducible byte for byte', () => {
 
 test('wizards exist in English and Italian and validate the network ID', () => {
   const entries = readTar(build().bytes).map((e) => e.name);
-  for (const name of ['install_uifile', 'install_uifile_enu', 'install_uifile_ita', 'upgrade_uifile_ita']) {
+  for (const name of ['install_uifile', 'install_uifile_enu', 'install_uifile_ita', 'upgrade_uifile_ita', 'uninstall_uifile', 'uninstall_uifile_ita']) {
     assert.ok(entries.includes(`WIZARD_UIFILES/${name}`), name);
   }
   const it = JSON.parse(installWizard('ita'));
   assert.equal(it[0].items[0].subitems[0].key, 'wizard_network_id');
-  assert.match(it[1].step_title, /attività all'avvio/);
+  assert.equal(it[1].step_title, 'Avvio automatico e guardia');
   const regex = it[0].items[0].subitems[0].validator.regex.expr.slice(1, -1);
   assert.ok(new RegExp(regex).test('abcdef0123456789'));
   assert.ok(!new RegExp(regex).test('abcdef012345678'));

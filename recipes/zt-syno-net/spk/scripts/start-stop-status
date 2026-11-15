@@ -1,21 +1,28 @@
 #!/bin/sh
 # zt-syno-net — DSM 7 start/stop/status control script.
 # Runs as the package user (conf/privilege: run-as package), never as root.
-# The rights zerotier-one needs (CAP_NET_ADMIN, /dev/net/tun) are granted by
-# bin/zt-syno-net-setup, run as root by a DSM boot-up task.
+# zerotier-one runs under bin/zt-syno-net-supervise, which restarts it if it
+# stops. The rights it needs (CAP_NET_ADMIN, /dev/net/tun) come from the root
+# guard started by the "zt-syno-net" boot-up task, created by the install
+# wizard; DSM 7 gives third-party packages no other way to get them.
 
 . "/var/packages/zt-syno-net/target/bin/zt-syno-net-env"
-PID_FILE="${HOME_DIR}/zerotier-one.pid"
-CAPS_MARK="${HOME_DIR}/.caps-granted"
+SUPERVISOR="${TARGET}/bin/zt-syno-net-supervise"
+SUP_PID="${HOME_DIR}/supervisor.pid"
 LOG_FILE="${HOME_DIR}/zt-syno-net.log"
+# Written by the root guard (root-owned, in /run): the identity of the binary
+# it granted the capability to. /bin/getcap is root-only on DSM, so this is
+# how the package user knows; after an install or upgrade it no longer matches
+# until the guard has done its job (within 30 seconds).
+CAPS_MARK="/run/zt-syno-net.caps"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "${LOG_FILE}"
 }
 
-is_running() {
-    [ -f "${PID_FILE}" ] || return 1
-    pid=$(cat "${PID_FILE}" 2>/dev/null)
+supervisor_running() {
+    [ -f "${SUP_PID}" ] || return 1
+    pid=$(cat "${SUP_PID}" 2>/dev/null)
     [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null
 }
 
@@ -27,20 +34,15 @@ prerequisites_ok() {
     # Never let zerotier-one invent a new identity when one exists but cannot be
     # read: the node would come up under a new address, unknown to the network.
     if [ -e "${HOME_DIR}/identity.secret" ] && [ ! -r "${HOME_DIR}/identity.secret" ]; then
-        log "ERROR: ${HOME_DIR}/identity.secret exists but is not readable by $(id -un). Run the boot-up task (bin/zt-syno-net-setup) as root."
+        log "ERROR: ${HOME_DIR}/identity.secret is not readable by $(id -un); the guard fixes it within 30 seconds"
         return 1
     fi
     if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
-        log "ERROR: /dev/net/tun missing or not writable. Run the boot-up task (bin/zt-syno-net-setup) as root."
+        log "ERROR: /dev/net/tun is not ready: is the zt-syno-net boot-up task present in Task Scheduler?"
         return 1
     fi
-    # /bin/getcap is root-only on DSM (mode 0700), so the package user cannot
-    # check the capability itself. The setup task records the identity of the
-    # binary it granted CAP_NET_ADMIN to; an install or upgrade replaces the
-    # binary, the record no longer matches, and the start refuses with a clear
-    # message instead of a confusing network error.
     if [ "$(stat -c '%i:%Y:%s' "${DAEMON}" 2>/dev/null)" != "$(cat "${CAPS_MARK}" 2>/dev/null)" ]; then
-        log "ERROR: ${DAEMON} has no CAP_NET_ADMIN yet (new install or upgrade). Run the boot-up task (bin/zt-syno-net-setup) as root."
+        log "ERROR: ${DAEMON} has no network capability yet: is the zt-syno-net boot-up task present in Task Scheduler?"
         return 1
     fi
     return 0
@@ -48,43 +50,35 @@ prerequisites_ok() {
 
 case "$1" in
     start)
-        if is_running; then
-            exit 0
-        fi
+        supervisor_running && exit 0
         prerequisites_ok || exit 1
-        # -U: we are not root on purpose; skip the privilege check.
-        "${DAEMON}" -U -d "${HOME_DIR}" >> "${LOG_FILE}" 2>&1
+        setsid /bin/sh "${SUPERVISOR}" </dev/null >/dev/null 2>&1 &
         i=0
-        while [ $i -lt 20 ]; do
-            if is_running; then
-                log "started (pid $(cat "${PID_FILE}"))"
-                exit 0
-            fi
+        while [ $i -lt 30 ]; do
+            if supervisor_running && [ -s "${HOME_DIR}/zerotier-one.port" ]; then exit 0; fi
             sleep 0.5
             i=$((i + 1))
         done
-        log "ERROR: zerotier-one did not start"
+        supervisor_running && exit 0
+        log "ERROR: the supervisor did not start"
         exit 1
         ;;
     stop)
-        if is_running; then
-            pid=$(cat "${PID_FILE}")
+        if supervisor_running; then
+            pid=$(cat "${SUP_PID}")
             kill "${pid}" 2>/dev/null
             i=0
-            while [ $i -lt 20 ] && kill -0 "${pid}" 2>/dev/null; do
-                sleep 0.5
-                i=$((i + 1))
-            done
-            kill -0 "${pid}" 2>/dev/null && kill -9 "${pid}" 2>/dev/null
-            log "stopped"
+            while [ $i -lt 30 ] && kill -0 "${pid}" 2>/dev/null; do sleep 0.5; i=$((i + 1)); done
+            kill -9 "${pid}" 2>/dev/null
         fi
-        rm -f "${PID_FILE}"
+        rm -f "${SUP_PID}"
+        # Leftover daemon, if the supervisor died hard.
+        zt_pid=$(cat "${HOME_DIR}/zerotier-one.pid" 2>/dev/null)
+        [ -n "${zt_pid}" ] && kill "${zt_pid}" 2>/dev/null
         exit 0
         ;;
     status)
-        if is_running; then
-            exit 0
-        fi
+        supervisor_running && exit 0
         exit 3
         ;;
     log)

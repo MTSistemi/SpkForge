@@ -6,8 +6,8 @@ zt-syno-net is ZeroTier One, built unmodified from the upstream source, packaged
 Synology NAS that runs DSM 7: Intel and AMD (x86_64), ARM 64-bit (armv8), ARM 32-bit (armv7) and
 Intel Atom 32-bit (i686).
 
-It runs **without root** and depends on **no other package**: no SimplePermissionManager, no
-privilege broker, nothing that can stop working on a date.
+It runs **without root**, depends on **no other package** and **keeps itself running**: no
+SimplePermissionManager, no privilege broker, nothing that can stop working on a date.
 
 ## Which file
 
@@ -22,38 +22,47 @@ privilege broker, nothing that can stop working on a date.
 ## Install
 
 1. Coming from the old `zerotier` package (spk7.imnks.com)? **Uninstall it first.** Its identity
-   and networks stay on disk; step 3 moves them, so the node ID does not change.
-2. Package Center > Manual Install > the `.spk`. The wizard asks for an optional network ID.
-3. **One-time setup, as root.** Control Panel > Task Scheduler > Create > Triggered Task >
-   User-defined script. User: `root`. Event: `Boot-up`. Command:
-
-   ```
-   /bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup
-   ```
-
-   Save, select the task, **Run**. It loads `tun`, grants `CAP_NET_ADMIN` to the ZeroTier binary,
-   migrates an older identity if there is one, and starts the package.
+   and networks stay on disk and are moved over automatically, so the node ID does not change.
+2. Package Center > Manual Install > the `.spk`.
+3. The wizard asks for a network ID (optional) and, on the **Automatic start and guard** step,
+   for your DSM password. DSM needs it to create the one task that runs as root, "zt-syno-net",
+   in Task Scheduler. That is all: the task is created and started at once.
 4. Authorise the node in your ZeroTier controller.
 
-After **every upgrade** of zt-syno-net, run the task once more: an upgrade replaces the binary and
-its capabilities.
+## Why a root task, and what it does
+
+DSM 7 gives a third-party package neither root execution nor network capabilities: we checked,
+DSM rejects the package ("ctrl-script ... should not exist", "tool capabilities should not
+exist"). ZeroTier needs `/dev/net/tun` and `CAP_NET_ADMIN`. The "zt-syno-net" task starts a small
+guard that every 30 seconds:
+
+- loads the `tun` module;
+- grants `CAP_NET_ADMIN` to the ZeroTier binary, also **after every upgrade**;
+- moves the identity of an older ZeroTier package, once;
+- starts the package when DSM wants it running and it is not.
+
+The guard's text lives **inside the task**, which DSM keeps root-owned: root never runs a file the
+package can modify. Inside the package, an unprivileged supervisor restarts ZeroTier when it stops
+or stops answering.
+
+Uninstalling removes the task. Identity and networks stay in `/var/packages/zt-syno-net/var`, so a
+reinstall keeps the same node ID.
 
 ## Use
 
-Over SSH, as any administrator:
+Over SSH, as an administrator (`sudo`):
 
 ```
-/var/packages/zt-syno-net/target/bin/zerotier-cli info
-/var/packages/zt-syno-net/target/bin/zerotier-cli join <network-id>
-/var/packages/zt-syno-net/target/bin/zerotier-cli listnetworks
+sudo zerotier-cli info
+sudo zerotier-cli join <network-id>
+sudo zerotier-cli listnetworks
 ```
-
-Data (identity, networks) lives in `/var/packages/zt-syno-net/var` and survives uninstall.
 
 ## When it does not start
 
-`/var/packages/zt-syno-net/var/zt-syno-net.log` says why. Almost always: the boot-up task has not
-run since the last install or upgrade. `setup.log` in the same folder logs the task itself.
-
-The task refuses to migrate an identity while another `zerotier-one` is running, because two
-daemons with the same identity knock each other off the network. Stop the old one first.
+- `/var/packages/zt-syno-net/var/zt-syno-net.log`: start, supervisor, restarts.
+- `/var/log/zt-syno-net-guard.log`: the root guard.
+- If Task Scheduler has no "zt-syno-net" task (for example you unticked the box during the
+  install), create it by hand: Triggered Task > User-defined script, user `root`, event `Boot-up`,
+  command `/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-guard`, then Run. This variant
+  runs a package file as root: the automatic creation is preferable.

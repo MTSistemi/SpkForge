@@ -21,9 +21,14 @@ test('the spksrc package depends on no other package and runs as the package use
   assert.match(makefile, /^DEPENDS = cross\/zerotier$/m);
   assert.doesNotMatch(makefile, /SPK_DEPENDS|INSTALL_DEP|SimplePermission/i);
   const setup = readFileSync(join(SRC, 'service-setup.sh'), 'utf8');
-  assert.ok(setup.includes('SERVICE_COMMAND="${ZEROTIER} -U '), 'daemon must run with -U as the package user');
+  assert.ok(setup.includes('SERVICE_COMMAND="/bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-supervise"'), 'runs under the supervisor');
+  assert.ok(readFileSync(join(SRC, 'zt-syno-net-supervise'), 'utf8').includes('"${DAEMON}" -U "${HOME_DIR}"'));
+  assert.ok(setup.includes('/run/zt-syno-net.caps'));
   assert.doesNotMatch(setup.replace(/^\s*#.*$/gm, ''), /getcap|setcap/, 'getcap/setcap are root-only on DSM');
   assert.ok(setup.includes('identity.secret" ] && [ ! -r'), 'must refuse to start with an unreadable identity');
-  const rootSetup = readFileSync(join(SRC, 'zt-syno-net-setup'), 'utf8');
-  assert.match(rootSetup, /^PKG_USER="sc-zt-syno-net"$/m);
+  const guard = readFileSync(join(SRC, 'zt-syno-net-guard'), 'utf8');
+  assert.match(guard, /^PKG_USER="sc-zt-syno-net"$/m);
+  assert.ok(guard.includes('echo "/var/packages/zt-syno-net/target/bin/zerotier-one"'));
+  const wizard = JSON.parse(readFileSync(join(SRC, 'wizard', 'install_uifile_ita'), 'utf8'));
+  assert.ok(wizard[1].deactivate_v2.includes('sc-zt-syno-net'), 'the task created by the wizard targets the spksrc user');
 });

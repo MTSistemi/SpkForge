@@ -6,8 +6,9 @@ zt-syno-net è ZeroTier One, compilato senza modifiche dai sorgenti upstream, im
 NAS Synology con DSM 7: Intel e AMD (x86_64), ARM a 64 bit (armv8), ARM a 32 bit (armv7) e Intel
 Atom a 32 bit (i686).
 
-Gira **senza root** e **non dipende da nessun altro pacchetto**: niente SimplePermissionManager,
-niente intermediari di privilegi, niente che possa smettere di funzionare a una data.
+Gira **senza root**, **non dipende da nessun altro pacchetto** e **si rimette in piedi da solo**:
+niente SimplePermissionManager, niente intermediari di privilegi, niente che possa smettere di
+funzionare a una data.
 
 ## Quale file
 
@@ -22,42 +23,48 @@ niente intermediari di privilegi, niente che possa smettere di funzionare a una 
 ## Installazione
 
 1. Arrivi dal vecchio pacchetto `zerotier` (spk7.imnks.com)? **Disinstallalo prima.** Identità e
-   reti restano su disco; il passo 3 le sposta, così il node ID non cambia.
-2. Centro pacchetti > Installazione manuale > il file `.spk`. La procedura chiede un ID di rete,
-   facoltativo.
-3. **Configurazione una tantum, come root.** Pannello di controllo > Utilità di pianificazione >
-   Crea > Attività attivata > Script definito dall'utente. Utente: `root`. Evento: `Avvio`.
-   Comando:
-
-   ```
-   /bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup
-   ```
-
-   Salva, seleziona l'attività, **Esegui**. Carica `tun`, dà `CAP_NET_ADMIN` all'eseguibile di
-   ZeroTier, migra un'identità precedente se c'è, e avvia il pacchetto.
+   reti restano su disco e vengono spostate da sole, così il node ID non cambia.
+2. Centro pacchetti > Installazione manuale > il file `.spk`.
+3. La procedura chiede un ID di rete (facoltativo) e, al passo **Avvio automatico e guardia**, la
+   tua password di DSM. Serve a DSM per creare l'unica attività che gira come root, "zt-syno-net",
+   nell'Utilità di pianificazione. È tutto qui: l'attività viene creata e avviata subito.
 4. Autorizza il nodo nel tuo controller ZeroTier.
 
-Dopo **ogni aggiornamento** di zt-syno-net esegui di nuovo l'attività: l'aggiornamento sostituisce
-l'eseguibile e le sue capability.
+## Perché un'attività di root, e cosa fa
+
+DSM 7 non concede a un pacchetto di terze parti né l'esecuzione come root né le capability di
+rete: lo abbiamo verificato, DSM rifiuta il pacchetto ("ctrl-script ... should not exist", "tool
+capabilities should not exist"). ZeroTier però ha bisogno di `/dev/net/tun` e di `CAP_NET_ADMIN`.
+L'attività "zt-syno-net" avvia un piccolo guardiano che ogni 30 secondi:
+
+- carica il modulo `tun`;
+- dà `CAP_NET_ADMIN` all'eseguibile di ZeroTier, anche **dopo ogni aggiornamento**;
+- sposta una volta sola l'identità di un vecchio pacchetto ZeroTier;
+- avvia il pacchetto se DSM lo vuole acceso ed è fermo.
+
+Il testo del guardiano sta **dentro l'attività**, conservata da DSM come root: root non esegue mai
+file che il pacchetto può modificare. Dentro il pacchetto, un supervisore senza privilegi riavvia
+ZeroTier se si ferma o smette di rispondere.
+
+La disinstallazione rimuove l'attività. Identità e reti restano in
+`/var/packages/zt-syno-net/var`, così una reinstallazione mantiene lo stesso node ID.
 
 ## Uso
 
-Da SSH, come qualunque amministratore:
+Da SSH, come amministratore (`sudo`):
 
 ```
-/var/packages/zt-syno-net/target/bin/zerotier-cli info
-/var/packages/zt-syno-net/target/bin/zerotier-cli join <id-rete>
-/var/packages/zt-syno-net/target/bin/zerotier-cli listnetworks
+sudo zerotier-cli info
+sudo zerotier-cli join <id-rete>
+sudo zerotier-cli listnetworks
 ```
-
-I dati (identità, reti) stanno in `/var/packages/zt-syno-net/var` e sopravvivono alla
-disinstallazione.
 
 ## Quando non parte
 
-`/var/packages/zt-syno-net/var/zt-syno-net.log` dice perché. Quasi sempre: l'attività all'avvio non
-è stata eseguita dopo l'ultima installazione o aggiornamento. `setup.log`, nella stessa cartella,
-registra l'attività stessa.
-
-L'attività rifiuta di migrare un'identità mentre un altro `zerotier-one` è in esecuzione, perché due
-servizi con la stessa identità si buttano fuori dalla rete a vicenda. Ferma prima quello vecchio.
+- `/var/packages/zt-syno-net/var/zt-syno-net.log`: avvio, supervisore, riavvii.
+- `/var/log/zt-syno-net-guard.log`: il guardiano di root.
+- Se nell'Utilità di pianificazione non c'è l'attività "zt-syno-net" (per esempio hai tolto la
+  spunta durante l'installazione), creala a mano: Attività attivata > Script definito dall'utente,
+  utente `root`, evento `Avvio`, comando
+  `/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-guard`, poi Esegui. Questa variante
+  esegue un file del pacchetto come root: la creazione automatica è da preferire.

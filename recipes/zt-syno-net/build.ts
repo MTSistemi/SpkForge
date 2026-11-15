@@ -21,7 +21,8 @@ import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
 import { platformsOf, writeTar, type Family, type TarInput } from '@spkforge/spk';
 import { renderIcon } from './icon.ts';
-import { wizardFiles } from './wizard.ts';
+import { SPKFORGE_GUARD, wizardFiles } from './wizard.ts';
+import { taskOperation } from './guard.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FILES = join(HERE, 'spk');
@@ -93,7 +94,11 @@ export function buildSpk(options: BuildOptions): BuildResult {
     ...families.map((family) => ({ name: `bin/zerotier-one-${family}`, data: binaries[family]!, mode: 0o755 })),
     { name: 'bin/zt-syno-net-env', data: asset('bin/zt-syno-net-env'), mode: 0o644 },
     { name: 'bin/zerotier-cli', data: asset('bin/zerotier-cli'), mode: 0o755 },
-    { name: 'bin/zt-syno-net-setup', data: asset('bin/zt-syno-net-setup'), mode: 0o755 },
+    { name: 'bin/zt-syno-net-supervise', data: asset('bin/zt-syno-net-supervise'), mode: 0o755 },
+    // Manual fallback only: the install wizard stores the guard inside the root task instead.
+    { name: 'bin/zt-syno-net-guard', data: `#!/bin/sh
+${taskOperation(SPKFORGE_GUARD)}
+`, mode: 0o755 },
     // DSM 7 resolves resource paths inside the installed package (target/).
     { name: 'app' },
     { name: 'app/zt-syno-net.sc', data: asset('app/zt-syno-net.sc') },
