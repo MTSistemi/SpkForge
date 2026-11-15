@@ -2,7 +2,7 @@
 
 English | [Italiano](README.it.md)
 
-A package source for Synology DSM 7, with a web interface, written from scratch by MTSistemi.
+A package source for Synology DSM 7, with a web interface, written from scratch.
 Its first package is ZeroTier, built from the latest upstream release.
 
 > Status: early development — not ready for use.
