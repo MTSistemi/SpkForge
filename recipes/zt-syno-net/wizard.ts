@@ -51,7 +51,7 @@ const TEXTS: Record<Lang, Texts> = {
     passwordNeeded: 'Enter your password, or untick the box to set it up by hand',
     badPassword: 'DSM did not accept the password',
     createFailed: 'DSM did not create the task. Untick the box and follow the manual steps below.',
-    created: 'Boot-up task created and started.',
+    created: 'Boot-up task created and started. Press Next to continue.',
     manualTitle: 'Manual setup, only if you untick the box',
     manualSteps: [
       'Control Panel > Task Scheduler > Create > Triggered Task > User-defined script. User: root. Event: Boot-up.',
@@ -77,7 +77,7 @@ const TEXTS: Record<Lang, Texts> = {
     passwordNeeded: 'Inserisci la password, oppure togli la spunta per configurarla a mano',
     badPassword: 'DSM non ha accettato la password',
     createFailed: 'DSM non ha creato l\'attività. Togli la spunta e segui i passi manuali qui sotto.',
-    created: 'Attività all\'avvio creata e avviata.',
+    created: 'Attività all\'avvio creata e avviata. Premi Avanti per continuare.',
     manualTitle: 'Configurazione manuale, solo se togli la spunta',
     manualSteps: [
       'Pannello di controllo > Utilità di pianificazione > Crea > Attività attivata > Script definito dall\'utente. Utente: root. Evento: Avvio.',
@@ -107,45 +107,61 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     operation: taskOperation(guard),
   };
   return `(step, wizard, action) {
-  if (action !== 'next' || step.ztDone) { return true; }
-  var form = step.getForm();
-  var box = form.findField('zt_create_task');
-  var pwField = form.findField('zt_admin_password');
-  var status = form.findField('zt_status');
-  var say = function (text) { if (status) { status.setValue(text); } };
-  if (!box || !box.getValue()) { if (pwField) { pwField.setValue(''); } step.ztDone = true; return true; }
-  var pw = pwField ? pwField.getValue() : '';
-  if (!pw) { if (pwField) { pwField.markInvalid(${JSON.stringify(t.passwordNeeded)}); } return false; }
-  pwField.setValue('');
   var owner = step.owner || wizard;
-  var request = function (api, method, version, params, cb) {
-    var call = { api: api, method: method, version: version, params: params, callback: cb, scope: step };
-    if (window.SYNO && SYNO.API && SYNO.API.Request) { SYNO.API.Request(call); }
-    else if (owner.sendWebAPI) { owner.sendWebAPI(call); }
-    else { step.sendWebAPI(call); }
+  var title = ${JSON.stringify(t.guardTitle)};
+  var show = function (text) {
+    try { if (owner.getMsgBox) { owner.getMsgBox().alert(title, text); return; } } catch (ignore) {}
+    window.alert(text);
   };
-  var fail = function (text) { if (owner.clearStatusBusy) { owner.clearStatusBusy(); } say(text); };
-  var task = ${JSON.stringify(task)};
-  if (owner.setStatusBusy) { owner.setStatusBusy(); }
-  request('SYNO.Core.User.PasswordConfirm', 'auth', 2, { password: pw }, function (ok, res) {
-    pw = '';
-    if (!ok || !res || !res.SynoConfirmPWToken) { fail(${JSON.stringify(t.badPassword)}); return; }
-    task.SynoConfirmPWToken = res.SynoConfirmPWToken;
-    request('SYNO.Core.EventScheduler', 'get', 1, { task_name: task.task_name }, function (exists) {
-      if (exists) { task.old_task_name = task.task_name; }
-      request('SYNO.Core.EventScheduler.Root', exists ? 'set' : 'create', 1, task, function (ok2) {
-        if (!ok2) { fail(${JSON.stringify(t.createFailed)}); return; }
-        request('SYNO.Core.EventScheduler', 'run', 1, { task_name: task.task_name }, function () {
-          if (owner.clearStatusBusy) { owner.clearStatusBusy(); }
-          say(${JSON.stringify(t.created)});
-          step.ztDone = true;
-          var next = owner.getButton ? owner.getButton('next') : null;
-          if (next && next.handler) { next.handler.call(next.scope || owner, next); }
+  var idle = function () { try { if (owner.clearStatusBusy) { owner.clearStatusBusy(); } } catch (ignore) {} };
+  try {
+    if (action !== 'next' || step.ztDone) { return true; }
+    var form = step.getForm();
+    var box = form.findField('zt_create_task');
+    var pwField = form.findField('zt_admin_password');
+    if (!box || !box.getValue()) { if (pwField) { pwField.setValue(''); } step.ztDone = true; return true; }
+    var pw = pwField ? pwField.getValue() : '';
+    if (!pw) { show(${JSON.stringify(t.passwordNeeded)}); return false; }
+    pwField.setValue('');
+    var request = function (api, method, version, params, cb) {
+      var call = { api: api, method: method, version: version, params: params, scope: step,
+        callback: function (success, response) {
+          try { cb(success, response); } catch (e) { idle(); show(${JSON.stringify(t.createFailed)} + ' (' + e + ')'); }
+        } };
+      if (owner.sendWebAPI) { owner.sendWebAPI(call); }
+      else if (step.sendWebAPI) { step.sendWebAPI(call); }
+      else if (window.SYNO && SYNO.API && SYNO.API.Request) { SYNO.API.Request(call); }
+      else { throw new Error('no DSM WebAPI client in this window'); }
+    };
+    var fail = function (text, response) {
+      idle();
+      var code = response && response.code ? ' [' + response.code + ']' : '';
+      show(text + code);
+    };
+    var task = ${JSON.stringify(task)};
+    try { if (owner.setStatusBusy) { owner.setStatusBusy(); } } catch (ignore) {}
+    request('SYNO.Core.User.PasswordConfirm', 'auth', 2, { password: pw }, function (ok, res) {
+      pw = '';
+      if (!ok || !res || !res.SynoConfirmPWToken) { fail(${JSON.stringify(t.badPassword)}, res); return; }
+      task.SynoConfirmPWToken = res.SynoConfirmPWToken;
+      request('SYNO.Core.EventScheduler', 'get', 1, { task_name: task.task_name }, function (exists) {
+        if (exists) { task.old_task_name = task.task_name; }
+        request('SYNO.Core.EventScheduler.Root', exists ? 'set' : 'create', 1, task, function (ok2, res2) {
+          if (!ok2) { fail(${JSON.stringify(t.createFailed)}, res2); return; }
+          request('SYNO.Core.EventScheduler', 'run', 1, { task_name: task.task_name }, function () {
+            idle();
+            step.ztDone = true;
+            show(${JSON.stringify(t.created)});
+          });
         });
       });
     });
-  });
-  return false;
+    return false;
+  } catch (e) {
+    idle();
+    show(${JSON.stringify(t.createFailed)} + ' (' + e + ')');
+    return false;
+  }
 }`;
 }
 
@@ -170,7 +186,6 @@ function guardStep(lang: Lang, guard: GuardOptions) {
       { desc: t.guardDesc },
       { type: 'multiselect', subitems: [{ key: 'zt_create_task', desc: t.guardCheckbox, defaultValue: true }] },
       { type: 'password', subitems: [{ key: 'zt_admin_password', desc: t.passwordLabel, defaultValue: '', validator: { allowBlank: true } }] },
-      { type: 'textfield', subitems: [{ key: 'zt_status', desc: '', defaultValue: '', disabled: true }] },
       { desc: `<b>${t.manualTitle}</b><br>${t.manualSteps.join('<br>')}` },
     ],
     deactivate_v2: createTaskScript(lang, guard),

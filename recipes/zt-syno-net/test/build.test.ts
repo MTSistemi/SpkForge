@@ -138,7 +138,9 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
     assert.match(body, /SYNO\.Core\.EventScheduler\.Root/);
     assert.match(body, /SYNO\.Core\.User\.PasswordConfirm/);
     const keys = step.items.flatMap((i: { subitems?: { key: string }[] }) => (i.subitems ?? []).map((s) => s.key));
-    assert.deepEqual(keys, ['zt_create_task', 'zt_admin_password', 'zt_status']);
+    assert.deepEqual(keys, ['zt_create_task', 'zt_admin_password']);
+    assert.match(body, /owner\.sendWebAPI/, 'uses the wizard window WebAPI client first');
+    assert.match(body, /catch \(e\)/, 'errors are shown, never swallowed');
     assert.equal(JSON.parse(upgradeWizard(lang))[0].deactivate_v2, body);
   }
 });
