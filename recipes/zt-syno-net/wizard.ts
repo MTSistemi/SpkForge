@@ -141,7 +141,7 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     };
     var fail = function (text, response) {
       idle();
-      var code = response && response.code ? ' [' + response.code + ']' : '';
+      var code = response && response.code ? ' [' + response.code + (response.errors ? ' ' + JSON.stringify(response.errors) : '') + ']' : '';
       show(text + code);
     };
     var task = ${JSON.stringify(task)};

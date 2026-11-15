@@ -107,6 +107,7 @@ test('the root guard never follows symlinks or recurses into package-owned paths
 test('the boot-up task embeds the guard and stays under DSM limits', () => {
   const op = taskOperation(SPKFORGE_GUARD);
   assert.ok(op.length < 8192, `task command is ${op.length} characters, DSM allows 8192`);
+  assert.ok(!op.includes('%'), 'DSM rejects task commands containing a percent sign (error 117)');
   assert.ok(op.includes(guardScript(SPKFORGE_GUARD).trimEnd()), 'the guard text is inside the task, not read from the package');
   assert.match(op, /setsid \/bin\/sh \/run\/zt-syno-net-guard\.sh/);
 });

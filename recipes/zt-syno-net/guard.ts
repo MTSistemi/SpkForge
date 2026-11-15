@@ -10,6 +10,10 @@
 // boot the task writes it to /run (root-owned tmpfs) and starts it there. The
 // guard never follows symlinks inside the package's directories.
 //
+// DSM refuses any task command that contains a percent sign (EventScheduler
+// create answers error 117), so the guard builds it at run time:
+// P=$(printf '\045') and uses \${P} in date and stat formats.
+//
 // Every 30 seconds the guard:
 //   - loads tun and makes /dev/net/tun usable;
 //   - grants CAP_NET_ADMIN/CAP_NET_RAW to the package's zerotier-one when it is
@@ -56,9 +60,11 @@ LOG="/var/log/$PKG-guard.log"
 PIDF="/run/$PKG-guard.pid"
 OLD_DIRS="/var/packages/zerotier/var /volume1/@appdata/zerotier"
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin
+# A literal percent sign is not allowed in a DSM task command: build it.
+P=$(printf '\\045')
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+    echo "$(date "+\${P}Y-\${P}m-\${P}d \${P}H:\${P}M:\${P}S") $*" >> "$LOG"
     if [ "$(wc -l < "$LOG")" -gt 500 ]; then tail -n 300 "$LOG" > "$LOG.tmp" && mv -f "$LOG.tmp" "$LOG"; fi
 }
 
@@ -79,11 +85,11 @@ ensure_tun() {
 ensure_caps() {
     d=$(daemon_path)
     plain_file "$d" || return
-    sig=$(stat -c '%i:%Y:%s' "$d")
-    if [ "$(cat "$MARK" 2>/dev/null)" = "$sig" ] && getcap "$d" | grep -q cap_net_admin && [ "$(stat -c %a "$d")" = 700 ]; then return; fi
+    sig=$(stat -c "\${P}i:\${P}Y:\${P}s" "$d")
+    if [ "$(cat "$MARK" 2>/dev/null)" = "$sig" ] && getcap "$d" | grep -q cap_net_admin && [ "$(stat -c "\${P}a" "$d")" = 700 ]; then return; fi
     # File capabilities apply to whoever runs the file: only the package user may.
     chmod 0700 "$d"
-    if setcap cap_net_admin,cap_net_raw=ep "$d" && [ "$(stat -c '%i:%Y:%s' "$d")" = "$sig" ] && plain_file "$d"; then
+    if setcap cap_net_admin,cap_net_raw=ep "$d" && [ "$(stat -c "\${P}i:\${P}Y:\${P}s" "$d")" = "$sig" ] && plain_file "$d"; then
         echo "$sig" > "$MARK" && chmod 0644 "$MARK"
         log "capabilities granted to $d"
     else
@@ -122,7 +128,7 @@ ensure_owner() {
     g=$(id -gn "$PKG_USER")
     for f in identity.public identity.secret; do
         p="$HOME_DIR/$f"
-        if plain_file "$p" && [ "$(stat -c %u "$p")" != "$uid" ]; then
+        if plain_file "$p" && [ "$(stat -c "\${P}u" "$p")" != "$uid" ]; then
             chown -h "$PKG_USER:$g" "$p" && log "owner of $f set to $PKG_USER"
         fi
     done
@@ -134,7 +140,7 @@ ensure_running() {
     st=$(synopkg status "$PKG" 2>/dev/null)
     case "$st" in *'"status":"running"'*) return ;; esac
     [ -f "$PKG_DIR/enabled" ] || echo "$st" | grep -q '"start_failed"' || return
-    now=$(date +%s)
+    now=$(date "+\${P}s")
     [ $((now - LAST_START)) -lt 60 ] && return
     LAST_START=$now
     if synopkg start "$PKG" >/dev/null 2>&1; then log "started $PKG"; else log "start of $PKG failed, see $HOME_DIR/$PKG.log"; fi
