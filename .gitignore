@@ -8,3 +8,6 @@ coverage/
 
 # Local, never published: fleet host lists and notes
 /.local/
+
+# Local demo data for the web interface
+/.demo-data/
