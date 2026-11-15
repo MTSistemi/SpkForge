@@ -21,7 +21,7 @@ progetto](docs/it/design.md), compreso cosa può e non può voler dire "firmato"
 | `packages/spk` | Lettura e scrittura degli archivi SPK: INFO, icone, elenco file, checksum |
 | `packages/server` | Endpoint per il Centro pacchetti DSM, API pubblica e di amministrazione |
 | `packages/web` | Interfaccia web, inglese e italiano |
-| `recipes/zerotier` | Ricetta di build dello SPK di ZeroTier |
+| `recipes/zt-syno-net` | zt-syno-net: ZeroTier per ogni CPU con DSM 7 ([documentazione](docs/it/zt-syno-net.md)) |
 | `docs/en`, `docs/it` | Documentazione |
 
 ## Sviluppo

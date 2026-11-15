@@ -51,6 +51,8 @@ scadenza", non la firma di DSM.
 
 Decisione:
 
+- **Nessuna dipendenza da altri pacchetti** (Mattia, 15/11/2026): né SPM, né altri intermediari
+  di privilegi, nessun `install_dep_packages`. Solo ciò che DSM fornisce più i nostri eseguibili.
 - **Nessuna dipendenza da SPM o da altri intermediari di privilegi.** Come il nostro ZeroTier
   ottiene i diritti che gli servono (`/dev/net/tun`, configurazione di rete) è un punto aperto, da
   chiudere su un NAS vero prima del rilascio; qualunque scelta non deve smettere di funzionare a
@@ -75,7 +77,7 @@ spkforge/
 ├─ packages/spk/      Libreria SPK: legge INFO, icone ed elenco file da un .spk (tar), checksum
 ├─ packages/server/   Server HTTP: endpoint catalogo DSM, API pubblica, API admin, indicizzatore
 ├─ packages/web/      Interfaccia web (React, bilingue en/it)
-├─ recipes/zerotier/  Come si costruisce lo SPK di ZeroTier: cross-compilazione, struttura, script
+├─ recipes/zt-syno-net/  Il pacchetto ZeroTier (zt-syno-net): build, struttura, script
 ├─ docs/en, docs/it   Documentazione, inglese e italiano
 └─ .github/workflows  CI, build dei pacchetti, release, attestazioni
 ```
@@ -130,12 +132,20 @@ Lato amministrazione (dietro login):
 - promuovere una versione da beta a stabile, ritirare una versione;
 - statistiche di download per pacchetto, versione, architettura e build DSM.
 
-### 3.3 Ricetta ZeroTier
+### 3.3 Pacchetto ZeroTier: zt-syno-net
 
 - Sorgente: il tag upstream di ZeroTierOne, solo client (codice MPL-2.0; `nonfree/` non si
   compila).
-- Binari statici per le famiglie DSM 7: x86_64, armv8 (aarch64), armv7.
-- Uno SPK per famiglia, versione `<upstream>-<build>`, per esempio `1.16.2-1`.
+- Nome del pacchetto `zt-syno-net` (guida: [zt-syno-net.md](zt-syno-net.md)).
+- Binari statici per ogni famiglia di CPU con DSM 7: x86_64 (Intel e AMD), armv8, armv7, i686;
+  più un pacchetto universale noarch con tutti e quattro, che sceglie quello giusto all'avvio e
+  si installa su qualunque modello, anche su piattaforme che mancano dal nostro elenco.
+- Uno SPK per famiglia più quello universale, versione `<upstream>-<build>`, per esempio
+  `1.16.2-1`.
+- Gira come utente del pacchetto con `CAP_NET_ADMIN`, concessa da un'attività all'avvio come
+  root che l'utente crea una volta nell'Utilità di pianificazione (`bin/zt-syno-net-setup`);
+  la stessa attività migra l'identità del vecchio pacchetto `zerotier`, così il node ID non
+  cambia.
 - Costruiti in GitHub Actions a ogni nuovo tag upstream, attestati, firmati, rilasciati.
 
 Punti tecnici aperti, da chiudere su un NAS vero prima della prima release:

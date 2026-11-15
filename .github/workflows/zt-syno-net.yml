@@ -1,0 +1,102 @@
+name: zt-syno-net
+
+# Builds ZeroTier One from upstream for every Synology CPU family (Intel/AMD
+# x86_64, ARM armv8 and armv7, Intel Atom i686), assembles the SPKs (one per
+# family plus a universal noarch one) and attests their build provenance.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zerotier_version:
+        description: Upstream ZeroTier One tag
+        default: '1.16.2'
+        required: true
+      build:
+        description: Package build number for this upstream version
+        default: '1'
+        required: true
+  push:
+    branches: [main]
+    paths:
+      - 'recipes/zt-syno-net/**'
+      - 'packages/spk/**'
+      - '.github/workflows/zt-syno-net.yml'
+
+permissions:
+  contents: read
+
+env:
+  ZEROTIER_VERSION: ${{ inputs.zerotier_version || '1.16.2' }}
+  PACKAGE_BUILD: ${{ inputs.build || '1' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm run check
+
+  zerotier:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: x86_64
+            platform: linux/amd64
+          - family: armv8
+            platform: linux/arm64
+          - family: armv7
+            platform: linux/arm/v7
+          - family: i686
+            platform: linux/386
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - name: Build zerotier-one ${{ env.ZEROTIER_VERSION }} for ${{ matrix.family }}
+        run: |
+          docker run --rm --platform "${{ matrix.platform }}" -v "$PWD:/w" alpine:3.20 \
+            sh /w/recipes/zt-syno-net/build-zerotier.sh "$ZEROTIER_VERSION" "/w/out/${{ matrix.family }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zerotier-one-${{ matrix.family }}
+          path: out/${{ matrix.family }}/
+          if-no-files-found: error
+
+  package:
+    needs: [test, zerotier]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: zerotier-one-*
+          path: out
+      - name: Assemble SPKs
+        run: |
+          node recipes/zt-syno-net/build.ts --version "$ZEROTIER_VERSION" --build "$PACKAGE_BUILD" --out dist \
+            --x86_64 out/zerotier-one-x86_64/zerotier-one \
+            --armv8 out/zerotier-one-armv8/zerotier-one \
+            --armv7 out/zerotier-one-armv7/zerotier-one \
+            --i686 out/zerotier-one-i686/zerotier-one
+          cd dist && sha256sum *.spk | tee SHA256SUMS
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.spk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zt-syno-net-${{ env.ZEROTIER_VERSION }}-${{ env.PACKAGE_BUILD }}
+          path: dist/
+          if-no-files-found: error

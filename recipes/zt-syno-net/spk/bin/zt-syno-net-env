@@ -1,0 +1,19 @@
+# zt-syno-net — shared settings, sourced by the package scripts (POSIX sh).
+# Picks the zerotier-one build for this CPU, so the same scripts serve the
+# per-family packages and the universal (noarch) package:
+#   Intel and AMD 64-bit -> x86_64, ARM 64-bit -> armv8,
+#   ARM 32-bit -> armv7, Intel 32-bit (Atom evansport) -> i686.
+
+PKG="zt-syno-net"
+TARGET="/var/packages/${PKG}/target"
+HOME_DIR="/var/packages/${PKG}/var"
+
+case "$(uname -m)" in
+    x86_64|amd64) ZT_FAMILY="x86_64" ;;
+    aarch64|arm64|armv8*) ZT_FAMILY="armv8" ;;
+    armv7*|armv6*|arm) ZT_FAMILY="armv7" ;;
+    i686|i586|i486|i386|x86) ZT_FAMILY="i686" ;;
+    *) ZT_FAMILY="unknown" ;;
+esac
+
+DAEMON="${TARGET}/bin/zerotier-one-${ZT_FAMILY}"

@@ -10,6 +10,8 @@ export interface TarEntry {
   /** "file", "directory", "symlink" or "other". */
   type: 'file' | 'directory' | 'symlink' | 'other';
   size: number;
+  /** Unix permission bits, e.g. 0o755. */
+  mode: number;
   /** File contents; empty for anything that is not a regular file. */
   data: Uint8Array;
 }
@@ -127,6 +129,7 @@ export function readTar(archive: Uint8Array): TarEntry[] {
       name: normalizeName(name),
       type,
       size: type === 'file' ? size : 0,
+      mode: readOctal(header, 100, 8) & 0o7777,
       data: type === 'file' ? data : new Uint8Array(0),
     });
   }

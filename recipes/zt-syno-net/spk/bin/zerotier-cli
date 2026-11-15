@@ -1,0 +1,5 @@
+#!/bin/sh
+# zt-syno-net — zerotier-cli for this package's daemon. zerotier-one acts as
+# the CLI when started with -q; -D points it at the package's home directory.
+. "/var/packages/zt-syno-net/target/bin/zt-syno-net-env"
+exec "${DAEMON}" -q "-D${HOME_DIR}" "$@"

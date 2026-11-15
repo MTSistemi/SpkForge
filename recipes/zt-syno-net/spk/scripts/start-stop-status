@@ -1,0 +1,85 @@
+#!/bin/sh
+# zt-syno-net — DSM 7 start/stop/status control script.
+# Runs as the package user (conf/privilege: run-as package), never as root.
+# The rights zerotier-one needs (CAP_NET_ADMIN, /dev/net/tun) are granted by
+# bin/zt-syno-net-setup, run as root by a DSM boot-up task.
+
+. "/var/packages/zt-syno-net/target/bin/zt-syno-net-env"
+PID_FILE="${HOME_DIR}/zerotier-one.pid"
+LOG_FILE="${HOME_DIR}/zt-syno-net.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "${LOG_FILE}"
+}
+
+is_running() {
+    [ -f "${PID_FILE}" ] || return 1
+    pid=$(cat "${PID_FILE}" 2>/dev/null)
+    [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null
+}
+
+prerequisites_ok() {
+    if [ ! -x "${DAEMON}" ]; then
+        log "ERROR: no zerotier-one build for this CPU ($(uname -m)) in this package; install the universal or the matching package"
+        return 1
+    fi
+    if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
+        log "ERROR: /dev/net/tun missing or not writable. Run the boot-up task (bin/zt-syno-net-setup) as root."
+        return 1
+    fi
+    if ! /bin/getcap "${DAEMON}" 2>/dev/null | grep -q cap_net_admin; then
+        log "ERROR: ${DAEMON} has no CAP_NET_ADMIN (lost after install or upgrade). Run the boot-up task (bin/zt-syno-net-setup) as root."
+        return 1
+    fi
+    return 0
+}
+
+case "$1" in
+    start)
+        if is_running; then
+            exit 0
+        fi
+        prerequisites_ok || exit 1
+        # -U: we are not root on purpose; skip the privilege check.
+        "${DAEMON}" -U -d "${HOME_DIR}" >> "${LOG_FILE}" 2>&1
+        i=0
+        while [ $i -lt 20 ]; do
+            if is_running; then
+                log "started (pid $(cat "${PID_FILE}"))"
+                exit 0
+            fi
+            sleep 0.5
+            i=$((i + 1))
+        done
+        log "ERROR: zerotier-one did not start"
+        exit 1
+        ;;
+    stop)
+        if is_running; then
+            pid=$(cat "${PID_FILE}")
+            kill "${pid}" 2>/dev/null
+            i=0
+            while [ $i -lt 20 ] && kill -0 "${pid}" 2>/dev/null; do
+                sleep 0.5
+                i=$((i + 1))
+            done
+            kill -0 "${pid}" 2>/dev/null && kill -9 "${pid}" 2>/dev/null
+            log "stopped"
+        fi
+        rm -f "${PID_FILE}"
+        exit 0
+        ;;
+    status)
+        if is_running; then
+            exit 0
+        fi
+        exit 3
+        ;;
+    log)
+        echo "${LOG_FILE}"
+        exit 0
+        ;;
+    *)
+        exit 1
+        ;;
+esac

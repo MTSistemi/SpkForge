@@ -31,6 +31,11 @@ export function knownPlatforms(): string[] {
   return [...FAMILY_OF.keys()].filter((name) => !(name in PLATFORMS) && !(name in FAMILY_ALIASES)).sort();
 }
 
+/** Concrete DSM platform names of a family (no family names or aliases), sorted. */
+export function platformsOf(family: Family): string[] {
+  return PLATFORMS[family].filter((name) => !(name in PLATFORMS) && !(name in FAMILY_ALIASES)).sort();
+}
+
 /** Split an INFO `arch` value ("x86_64 armv8", "geminilake apollolake") into tokens. */
 export function parseArchList(value: string | undefined): string[] {
   return (value ?? '')

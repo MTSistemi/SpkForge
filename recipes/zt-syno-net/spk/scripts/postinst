@@ -1,0 +1,23 @@
+#!/bin/sh
+# zt-syno-net — after install. Runs as the package user.
+# If the install wizard was given a network ID, queue it: zerotier-one joins
+# every network listed in networks.d when it starts.
+
+HOME_DIR="/var/packages/zt-syno-net/var"
+
+mkdir -p "${HOME_DIR}/networks.d"
+
+network_id=$(echo "${wizard_network_id:-}" | tr 'A-F' 'a-f' | tr -d ' ')
+case "${network_id}" in
+    "") ;;
+    *[!0-9a-f]*)
+        echo "Network ID must be 16 hexadecimal characters" > "${SYNOPKG_TEMP_LOGFILE:-/dev/null}"
+        ;;
+    *)
+        if [ ${#network_id} -eq 16 ]; then
+            : > "${HOME_DIR}/networks.d/${network_id}.conf"
+        fi
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,6 @@
+#!/bin/sh
+# zt-syno-net — lifecycle step with nothing to do. Copied by the build to
+# preinst, preuninst, postuninst, preupgrade and postupgrade.
+# Uninstall keeps /var/packages/zt-syno-net/var (identity and networks) so a
+# reinstall keeps the same ZeroTier node ID.
+exit 0

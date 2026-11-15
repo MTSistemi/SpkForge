@@ -1,0 +1,91 @@
+#!/bin/sh
+# zt-syno-net — host preparation. MUST run as root, from a DSM Task Scheduler
+# "Triggered Task > Boot-up" owned by root:
+#
+#     /bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup
+#
+# Run it also once by hand after every install or upgrade (an upgrade replaces
+# the binary and drops its capabilities). Safe to run any number of times.
+#
+# What it does:
+#   1. loads the tun module and makes sure /dev/net/tun exists;
+#   2. grants CAP_NET_ADMIN and CAP_NET_RAW to the package's zerotier-one,
+#      which then runs as the package user (no root, no privilege broker);
+#   3. on first run only, copies the identity and joined networks of an older
+#      ZeroTier package (e.g. the "zerotier" package from the closed
+#      spk7.imnks.com source), so the node ID does not change;
+#   4. starts the package if it is enabled.
+#
+# It never deletes anything, and it refuses to migrate while another
+# zerotier-one is running, because two daemons with one identity collide.
+
+[ -f "/var/packages/zt-syno-net/target/bin/zt-syno-net-env" ] || { echo "zt-syno-net is not installed, nothing to do"; exit 0; }
+. "/var/packages/zt-syno-net/target/bin/zt-syno-net-env"
+LOG_FILE="${HOME_DIR}/setup.log"
+OLD_DIRS="${ZT_SYNO_NET_OLD_DIRS:-/var/packages/zerotier/var /volume1/@appdata/zerotier}"
+
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin:/usr/local/sbin:/usr/local/bin
+
+log() {
+    msg="$(date '+%Y-%m-%d %H:%M:%S') $*"
+    echo "${msg}"
+    [ -d "${HOME_DIR}" ] && echo "${msg}" >> "${LOG_FILE}"
+}
+
+die() {
+    log "ERROR: $*"
+    exit 1
+}
+
+[ "$(id -u)" = "0" ] || die "must run as root (create the boot-up task with user root)"
+[ -x "${DAEMON}" ] || die "no zerotier-one build for this CPU ($(uname -m)) in the installed package"
+
+owner=$(stat -c '%U:%G' "${HOME_DIR}") || die "cannot read ${HOME_DIR}"
+
+# 1. tun
+if ! lsmod | grep -qw tun; then
+    insmod /lib/modules/tun.ko 2>/dev/null || modprobe tun 2>/dev/null || die "cannot load the tun module"
+fi
+if [ ! -c /dev/net/tun ]; then
+    mkdir -p /dev/net
+    mknod /dev/net/tun c 10 200 || die "cannot create /dev/net/tun"
+fi
+chmod 0666 /dev/net/tun
+
+# 2. capabilities
+if ! getcap "${DAEMON}" 2>/dev/null | grep -q cap_net_admin; then
+    setcap cap_net_admin,cap_net_raw=ep "${DAEMON}" || die "setcap failed on ${DAEMON}"
+    log "granted cap_net_admin,cap_net_raw to ${DAEMON}"
+fi
+
+# 3. one-time migration from an older ZeroTier package
+if [ ! -f "${HOME_DIR}/identity.secret" ]; then
+    for old in ${OLD_DIRS}; do
+        [ -f "${old}/identity.secret" ] || continue
+        others=$(ps -eo pid,args 2>/dev/null | grep '[z]erotier-one' | grep -v "${TARGET}/bin/zerotier-one-")
+        if [ -n "${others}" ]; then
+            die "another zerotier-one is running; stop it before migrating its identity from ${old}: ${others}"
+        fi
+        for f in identity.public identity.secret local.conf; do
+            [ -f "${old}/${f}" ] && cp -p "${old}/${f}" "${HOME_DIR}/${f}"
+        done
+        for d in networks.d moons.d; do
+            if [ -d "${old}/${d}" ]; then
+                mkdir -p "${HOME_DIR}/${d}"
+                cp -p "${old}/${d}/"*.conf "${old}/${d}/"*.local.conf "${old}/${d}/"*.moon "${HOME_DIR}/${d}/" 2>/dev/null
+            fi
+        done
+        chown -R "${owner}" "${HOME_DIR}"
+        chmod 0600 "${HOME_DIR}/identity.secret"
+        log "migrated identity $(cut -c1-10 "${HOME_DIR}/identity.public") from ${old}"
+        break
+    done
+fi
+
+# 4. start the package if DSM has it enabled
+if [ -f "/var/packages/${PKG}/enabled" ]; then
+    synopkg start "${PKG}" >/dev/null 2>&1 || log "synopkg start ${PKG} failed; see ${HOME_DIR}/zt-syno-net.log"
+fi
+
+log "setup done"
+exit 0

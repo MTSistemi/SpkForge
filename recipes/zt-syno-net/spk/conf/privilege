@@ -1,0 +1,7 @@
+{
+    "defaults": {
+        "run-as": "package"
+    },
+    "username": "zt-syno-net",
+    "groupname": "zt-syno-net"
+}

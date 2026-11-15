@@ -50,6 +50,8 @@ So the failure mode is "a third-party privilege broker with a time-limited key",
 
 Decision:
 
+- **No dependency on any other package** (Mattia, 2026-11-15): not SPM, not any privilege broker, no
+  `install_dep_packages`. Only what DSM itself ships plus our own binaries.
 - **No dependency on SPM or any other privilege broker.** How our ZeroTier gets the rights it
   needs (`/dev/net/tun`, network configuration) is an open design point, settled on a real NAS
   before release; whatever we choose must not stop working on a date.
@@ -72,7 +74,7 @@ spkforge/
 ├─ packages/spk/      SPK library: read INFO, icons and file list from an .spk (tar), checksums
 ├─ packages/server/   HTTP server: DSM catalog endpoint, public API, admin API, indexer
 ├─ packages/web/      Web interface (React, bilingual en/it)
-├─ recipes/zerotier/  How the ZeroTier SPK is built: cross-compile, layout, scripts
+├─ recipes/zt-syno-net/  The ZeroTier package (zt-syno-net): build, layout, scripts
 ├─ docs/en, docs/it   Documentation, English and Italian
 └─ .github/workflows  CI, package builds, releases, attestations
 ```
@@ -126,11 +128,17 @@ Admin side (behind login):
 - promote a version from beta to stable, withdraw a version;
 - download statistics per package, version, architecture and DSM build.
 
-### 3.3 ZeroTier recipe
+### 3.3 ZeroTier package: zt-syno-net
 
 - Source: the upstream ZeroTierOne tag, client only (MPL-2.0 code; `nonfree/` is not built).
-- Static binaries for the DSM 7 families: x86_64, armv8 (aarch64), armv7.
-- One SPK per family, version `<upstream>-<build>`, e.g. `1.16.2-1`.
+- Package name `zt-syno-net` (user guide: [zt-syno-net.md](zt-syno-net.md)).
+- Static binaries for every DSM 7 CPU family: x86_64 (Intel and AMD), armv8, armv7, i686;
+  plus a universal noarch package holding all four, which picks the right one at start and
+  installs on any model, even on platforms missing from our list.
+- One SPK per family plus the universal one, version `<upstream>-<build>`, e.g. `1.16.2-1`.
+- Runs as the package user with `CAP_NET_ADMIN`, granted by a root boot-up task the user
+  creates once in Task Scheduler (`bin/zt-syno-net-setup`); that task also migrates the
+  identity of the old `zerotier` package, so the node ID does not change.
 - Built in GitHub Actions on every new upstream tag, attested, signed, released.
 
 Open technical points, to settle on a real NAS before the first release:

@@ -12,6 +12,7 @@ export interface SpkFile {
   name: string;
   type: TarEntry['type'];
   size: number;
+  mode: number;
 }
 
 export interface SpkPackage {
@@ -54,7 +55,7 @@ export function readSpk(bytes: Uint8Array): SpkPackage {
     id: info.package ?? '',
     version: info.version ?? '',
     arch: parseArchList(info.arch),
-    files: entries.map(({ name, type, size }) => ({ name, type, size })),
+    files: entries.map(({ name, type, size, mode }) => ({ name, type, size, mode })),
     icon: byName.get('PACKAGE_ICON.PNG')?.data.slice(),
     icon256: byName.get('PACKAGE_ICON_256.PNG')?.data.slice(),
     size: bytes.length,

@@ -21,7 +21,7 @@ and cannot mean on DSM 7.
 | `packages/spk` | Read and write SPK archives: INFO, icons, file list, checksums |
 | `packages/server` | DSM Package Center endpoint, public and admin API |
 | `packages/web` | Web interface, English and Italian |
-| `recipes/zerotier` | Build recipe for the ZeroTier SPK |
+| `recipes/zt-syno-net` | zt-syno-net: ZeroTier for every DSM 7 CPU ([docs](docs/en/zt-syno-net.md)) |
 | `docs/en`, `docs/it` | Documentation |
 
 ## Development
