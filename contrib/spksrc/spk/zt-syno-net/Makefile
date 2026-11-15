@@ -8,8 +8,8 @@ DEPENDS = cross/zerotier
 REQUIRED_MIN_DSM = 7.0
 
 MAINTAINER = MTSistemi
-DESCRIPTION = ZeroTier One: join this NAS to your ZeroTier networks. Runs without root and needs no other package: a one-time boot-up task grants the network capability (see the install wizard).
-DESCRIPTION_ITA = ZeroTier One: collega questo NAS alle tue reti ZeroTier. Gira senza root e non richiede altri pacchetti: un\'attività all\'avvio, da creare una volta, concede il permesso di rete (vedi la procedura di installazione).
+DESCRIPTION = ZeroTier One: join this NAS to your ZeroTier networks. Runs without root and needs no other package: a one-time boot-up task, explained in the install wizard, grants the network capability.
+DESCRIPTION_ITA = ZeroTier One: collega questo NAS alle tue reti ZeroTier. Gira senza root e non richiede altri pacchetti: un'attività all'avvio da creare una volta, spiegata nella procedura di installazione, concede il permesso di rete.
 DISPLAY_NAME = ZeroTier
 CHANGELOG = "1. Initial release: ZeroTier One 1.16.2."
 HOMEPAGE = https://www.zerotier.com
