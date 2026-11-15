@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 // The root guard of zt-syno-net and the DSM boot-up task that runs it.
 //
 // DSM 7 refuses any root step or file capability in a third-party package
@@ -14,10 +16,12 @@
 // create answers error 117), so the guard builds it at run time:
 // P=$(printf '\045') and uses \${P} in date and stat formats.
 //
-// Every 30 seconds the guard:
+// Every 5 seconds the guard (cheap checks, so an upgrade waits seconds, not half
+// a minute, for the capability; ZeroTier is down meanwhile):
 //   - loads tun and makes /dev/net/tun usable;
 //   - grants CAP_NET_ADMIN/CAP_NET_RAW to the package's zerotier-one when it is
-//     new (install, upgrade) and records it in /run/<pkg>.caps for the package;
+//     new (install, upgrade) and records it in /run/<pkg>.caps for the package.
+// Every 30 seconds it also:
 //   - migrates the identity of an older ZeroTier package once;
 //   - keeps the identity owned by the package user;
 //   - starts the package when DSM wants it running and it is not.
@@ -31,7 +35,7 @@ export interface GuardOptions {
   daemon: 'per-family' | string;
 }
 
-export const GUARD_VERSION = 1;
+export const GUARD_VERSION = 2;
 export const TASK_NAME = 'zt-syno-net';
 const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
 
@@ -58,6 +62,7 @@ HOME_DIR="$PKG_DIR/var"
 MARK="/run/$PKG.caps"
 LOG="/var/log/$PKG-guard.log"
 PIDF="/run/$PKG-guard.pid"
+VERF="/run/$PKG-guard.ver"
 OLD_DIRS="/var/packages/zerotier/var /volume1/@appdata/zerotier"
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin
 # A literal percent sign is not allowed in a DSM task command: build it.
@@ -146,25 +151,61 @@ ensure_running() {
     if synopkg start "$PKG" >/dev/null 2>&1; then log "started $PKG"; else log "start of $PKG failed, see $HOME_DIR/$PKG.log"; fi
 }
 
-if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; then exit 0; fi
+# One guard at a time. A guard of another build (the task was just updated)
+# hands over: it is stopped and this one takes its place. The pid is checked
+# against /proc first, so a recycled pid never kills an unrelated process.
+old=$(cat "$PIDF" 2>/dev/null)
+if [ -n "$old" ] && [ "$old" != "$$" ] && tr '\\000' ' ' < "/proc/$old/cmdline" 2>/dev/null | grep -q "$PKG-guard.sh"; then
+    if [ "$(cat "$VERF" 2>/dev/null)" = "$(cksum < "$0")" ]; then exit 0; fi
+    kill "$old" 2>/dev/null
+    sleep 1
+    kill -9 "$old" 2>/dev/null
+    log "replaced the guard of another build (pid $old)"
+fi
 echo $$ > "$PIDF"
+cksum < "$0" > "$VERF"
 log "guard v${GUARD_VERSION} started"
 absent=0
+# Heavier checks every 6 rounds (30 s), counted: no modulo sign in a task command.
+round=6
 while :; do
     if installed; then
         absent=0
         ensure_tun
         ensure_caps
-        migrate
-        ensure_owner
-        ensure_running
+        round=$((round + 1))
+        if [ "$round" -ge 6 ]; then
+            round=0
+            migrate
+            ensure_owner
+            ensure_running
+        fi
     else
         absent=$((absent + 1))
-        if [ "$absent" -gt 60 ]; then log "$PKG not installed for 30 minutes, guard exits"; rm -f "$PIDF"; exit 0; fi
+        if [ "$absent" -gt 360 ]; then log "$PKG not installed for 30 minutes, guard exits"; rm -f "$PIDF"; exit 0; fi
     fi
-    sleep 30
+    sleep 5
 done
 `;
+}
+
+/** The launcher shipped in the package as bin/zt-syno-net-guard, for the manual setup only. */
+export function launcherFile(options: GuardOptions): string {
+  return `#!/bin/sh
+${taskOperation(options)}
+`;
+}
+
+/**
+ * The command for a hand-made boot-up task. Root must never run a file the
+ * package user can change, so it copies the launcher to /run (root-only), checks
+ * the copy against the SHA-256 of this exact build and only then runs it.
+ * No percent sign: DSM refuses it in a task command.
+ */
+export function manualCommand(options: GuardOptions, launcherPath: string): string {
+  const sha = createHash('sha256').update(launcherFile(options)).digest('hex');
+  const copy = `/run/${options.pkg}-launch.sh`;
+  return `cp ${launcherPath} ${copy} && chmod 0700 ${copy} && echo "${sha}  ${copy}" | sha256sum -c --status && /bin/sh ${copy}`;
 }
 
 /** The command line of the boot-up task: write the guard to /run and start it detached. */

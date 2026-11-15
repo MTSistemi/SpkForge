@@ -1,14 +1,24 @@
 {
-    ".url": {
-        "SpkForge.ZtSynoNet": {
-            "type": "legacy",
-            "allUsers": false,
-            "title": "ZeroTier",
-            "desc": "ZeroTier (zt-syno-net)",
+    "ZtSynoNet.js": {
+        "SpkForge.ZtSynoNet.Instance": {
+            "type": "app",
+            "version": "@VERSION@",
+            "title": "app:app_name",
+            "desc": "app:description",
             "icon": "images/icon_{0}.png",
-            "url": "/webman/3rdparty/zt-syno-net/index.html",
-            "width": 900,
-            "height": 640
+            "texts": "texts",
+            "allowMultiInstance": false,
+            "allUsers": false,
+            "appWindow": "SpkForge.ZtSynoNet.MainWindow",
+            "depend": ["SpkForge.ZtSynoNet.MainWindow"]
+        },
+        "SpkForge.ZtSynoNet.MainWindow": {
+            "type": "lib",
+            "version": "@VERSION@",
+            "title": "app:app_name",
+            "icon": "images/icon_{0}.png",
+            "texts": "texts",
+            "depend": []
         }
     }
 }

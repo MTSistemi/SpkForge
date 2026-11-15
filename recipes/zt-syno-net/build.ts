@@ -22,7 +22,7 @@ import { gzipSync } from 'node:zlib';
 import { platformsOf, writeTar, type Family, type TarInput } from '@spkforge/spk';
 import { renderIcon } from './icon.ts';
 import { SPKFORGE_GUARD, wizardFiles } from './wizard.ts';
-import { taskOperation } from './guard.ts';
+import { launcherFile } from './guard.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FILES = join(HERE, 'spk');
@@ -30,7 +30,7 @@ export const FAMILIES: readonly Family[] = ['x86_64', 'armv8', 'armv7', 'i686'];
 const LIFECYCLE_NOOP = ['preinst', 'preuninst', 'postuninst', 'preupgrade', 'postupgrade'];
 /** Sizes DSM asks for when it substitutes {0} in the app and service icon paths. */
 const APP_ICON_SIZES = [16, 24, 32, 48, 64, 72, 96, 128, 256];
-export const APP_NAME = 'SpkForge.ZtSynoNet';
+export const APP_NAME = 'SpkForge.ZtSynoNet.Instance';
 
 export const PACKAGE = 'zt-syno-net';
 
@@ -58,6 +58,16 @@ function asset(path: string): string {
   return readFileSync(join(FILES, path), 'utf8');
 }
 
+/**
+ * An app file whose links carry the package version (@VERSION@), so browsers
+ * fetch the new files after an upgrade instead of reusing cached ones.
+ */
+function versioned(path: string, version: string): string {
+  const text = asset(path);
+  if (!text.includes('@VERSION@')) throw new Error(`${path} has no @VERSION@ placeholder`);
+  return text.replaceAll('@VERSION@', version);
+}
+
 function infoText(info: Record<string, string>): string {
   return Object.entries(info)
     .map(([key, value]) => `${key}="${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
@@ -77,6 +87,29 @@ ZeroTier is a trademark of ZeroTier, Inc. This package is not made or endorsed b
 Packaging scripts: Copyright (C) 2026 MTSistemi, GNU Affero General Public License v3.0 or later,
 https://github.com/MTSistemi/SpkForge
 `;
+}
+
+/**
+ * The DSM app (window, page, CGI, texts, icons) under app/, for the given
+ * package version. Shared with the spksrc recipe (contrib/spksrc/generate.ts).
+ */
+export function appFiles(version: string): { name: string; data?: string | Uint8Array; mode?: number }[] {
+  return [
+    { name: 'app/config', data: versioned('app/config', version) },
+    { name: 'app/ZtSynoNet.js', data: versioned('app/ZtSynoNet.js', version) },
+    { name: 'app/texts' },
+    { name: 'app/texts/enu' },
+    { name: 'app/texts/enu/strings', data: asset('app/texts/enu/strings') },
+    { name: 'app/texts/ita' },
+    { name: 'app/texts/ita/strings', data: asset('app/texts/ita/strings') },
+    { name: 'app/index.html', data: versioned('app/index.html', version) },
+    { name: 'app/app.js', data: asset('app/app.js') },
+    { name: 'app/app.css', data: asset('app/app.css') },
+    { name: 'app/cgi' },
+    { name: 'app/cgi/api.cgi', data: asset('app/cgi/api.cgi'), mode: 0o755 },
+    { name: 'app/images' },
+    ...APP_ICON_SIZES.map((size) => ({ name: `app/images/icon_${size}.png`, data: renderIcon(size) })),
+  ];
 }
 
 export function buildSpk(options: BuildOptions): BuildResult {
@@ -99,21 +132,12 @@ export function buildSpk(options: BuildOptions): BuildResult {
     { name: 'bin/zerotier-cli', data: asset('bin/zerotier-cli'), mode: 0o755 },
     { name: 'bin/zt-syno-net-supervise', data: asset('bin/zt-syno-net-supervise'), mode: 0o755 },
     // Manual fallback only: the install wizard stores the guard inside the root task instead.
-    { name: 'bin/zt-syno-net-guard', data: `#!/bin/sh
-${taskOperation(SPKFORGE_GUARD)}
-`, mode: 0o755 },
+    { name: 'bin/zt-syno-net-guard', data: launcherFile(SPKFORGE_GUARD), mode: 0o755 },
     // DSM 7 resolves resource paths inside the installed package (target/).
     // app/ is also the DSM app, served as /webman/3rdparty/zt-syno-net/.
     { name: 'app' },
     { name: 'app/zt-syno-net.sc', data: asset('app/zt-syno-net.sc') },
-    { name: 'app/config', data: asset('app/config') },
-    { name: 'app/index.html', data: asset('app/index.html') },
-    { name: 'app/app.js', data: asset('app/app.js') },
-    { name: 'app/app.css', data: asset('app/app.css') },
-    { name: 'app/cgi' },
-    { name: 'app/cgi/api.cgi', data: asset('app/cgi/api.cgi'), mode: 0o755 },
-    { name: 'app/images' },
-    ...APP_ICON_SIZES.map((size) => ({ name: `app/images/icon_${size}.png`, data: renderIcon(size) })),
+    ...appFiles(version),
   ]);
   const packageTgz = gzipSync(payload, { level: 9 });
 

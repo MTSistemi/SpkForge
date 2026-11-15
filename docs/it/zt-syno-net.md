@@ -35,16 +35,24 @@ funzionare a una data.
 DSM 7 non concede a un pacchetto di terze parti né l'esecuzione come root né le capability di
 rete: lo abbiamo verificato, DSM rifiuta il pacchetto ("ctrl-script ... should not exist", "tool
 capabilities should not exist"). ZeroTier però ha bisogno di `/dev/net/tun` e di `CAP_NET_ADMIN`.
-L'attività "zt-syno-net" avvia un piccolo guardiano che ogni 30 secondi:
+L'attività "zt-syno-net" avvia un piccolo guardiano che:
 
-- carica il modulo `tun`;
-- dà `CAP_NET_ADMIN` all'eseguibile di ZeroTier, anche **dopo ogni aggiornamento**;
-- sposta una volta sola l'identità di un vecchio pacchetto ZeroTier;
+- ogni 5 secondi carica il modulo `tun` e dà `CAP_NET_ADMIN` all'eseguibile di ZeroTier, anche
+  **dopo ogni aggiornamento** (così un aggiornamento ferma ZeroTier solo per pochi secondi);
+- ogni 30 secondi sposta una volta sola l'identità di un vecchio pacchetto ZeroTier;
 - avvia il pacchetto se DSM lo vuole acceso ed è fermo.
 
 Il testo del guardiano sta **dentro l'attività**, conservata da DSM come root: root non esegue mai
 file che il pacchetto può modificare. Dentro il pacchetto, un supervisore senza privilegi riavvia
-ZeroTier se si ferma o smette di rispondere.
+ZeroTier se si ferma o smette di rispondere (controlla sia lo stato del nodo sia l'elenco delle
+reti).
+
+### Uscire da una rete
+
+L'app esce da una rete fermando ZeroTier, dimenticando quella rete e riavviandolo: le altre reti si
+interrompono per qualche secondo. La via diretta (`zerotier-cli leave` o l'API locale) è evitata di
+proposito: con ZeroTier 1.16 sul kernel 4.4 di DSM blocca il daemon fino al riavvio, quindi non va
+usata nemmeno da SSH.
 
 La disinstallazione rimuove l'attività. Identità e reti restano in
 `/var/packages/zt-syno-net/var`, così una reinstallazione mantiene lo stesso node ID.
@@ -65,6 +73,8 @@ sudo zerotier-cli listnetworks
 - `/var/log/zt-syno-net-guard.log`: il guardiano di root.
 - Se nell'Utilità di pianificazione non c'è l'attività "zt-syno-net" (per esempio hai tolto la
   spunta durante l'installazione), creala a mano: Attività attivata > Script definito dall'utente,
-  utente `root`, evento `Avvio`, comando
-  `/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-guard`, poi Esegui. Questa variante
-  esegue un file del pacchetto come root: la creazione automatica è da preferire.
+  utente `root`, evento `Avvio`, poi Esegui. Usa il comando mostrato dalla procedura di
+  installazione: copia il launcher in `/run`, ne verifica lo SHA-256 rispetto a questa build e solo
+  allora lo esegue, così root non esegue mai un file che il pacchetto può modificare. Il comando
+  cambia a ogni build: dopo un aggiornamento va aggiornata l'attività. La creazione automatica fa
+  tutto questo da sola.

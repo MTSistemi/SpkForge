@@ -41,7 +41,11 @@ while :; do
         wait $!
         ticks=$((ticks + 1))
         if [ $((ticks % CHECK_EVERY)) -eq 0 ]; then
-            if timeout 10 "${DAEMON}" -q "-D${HOME_DIR}" info >/dev/null 2>&1; then
+            # /status alone is not enough: on DSM's 4.4 kernel a network leave
+            # can wedge zerotier-one's network lock while /status still answers,
+            # so the network list (and with it the data path) is checked too.
+            if timeout 10 "${DAEMON}" -q "-D${HOME_DIR}" info >/dev/null 2>&1 &&
+                timeout 10 "${DAEMON}" -q "-D${HOME_DIR}" listnetworks >/dev/null 2>&1; then
                 misses=0
             else
                 misses=$((misses + 1))

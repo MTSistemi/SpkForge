@@ -34,16 +34,23 @@ SimplePermissionManager, no privilege broker, nothing that can stop working on a
 DSM 7 gives a third-party package neither root execution nor network capabilities: we checked,
 DSM rejects the package ("ctrl-script ... should not exist", "tool capabilities should not
 exist"). ZeroTier needs `/dev/net/tun` and `CAP_NET_ADMIN`. The "zt-syno-net" task starts a small
-guard that every 30 seconds:
+guard that:
 
-- loads the `tun` module;
-- grants `CAP_NET_ADMIN` to the ZeroTier binary, also **after every upgrade**;
-- moves the identity of an older ZeroTier package, once;
+- every 5 seconds loads the `tun` module and grants `CAP_NET_ADMIN` to the ZeroTier binary, also
+  **after every upgrade** (so an upgrade interrupts ZeroTier for a few seconds only);
+- every 30 seconds moves the identity of an older ZeroTier package, once;
 - starts the package when DSM wants it running and it is not.
 
 The guard's text lives **inside the task**, which DSM keeps root-owned: root never runs a file the
 package can modify. Inside the package, an unprivileged supervisor restarts ZeroTier when it stops
-or stops answering.
+or stops answering (it checks both the node status and the network list).
+
+### Leaving a network
+
+The app leaves a network by stopping ZeroTier, forgetting that network and starting ZeroTier again:
+the other networks pause for a few seconds. The direct way (`zerotier-cli leave`, or the local API)
+is avoided on purpose: with ZeroTier 1.16 on DSM's 4.4 kernel it wedges the daemon until a
+restart, so do not use it over SSH either.
 
 Uninstalling removes the task. Identity and networks stay in `/var/packages/zt-syno-net/var`, so a
 reinstall keeps the same node ID.
@@ -64,5 +71,7 @@ sudo zerotier-cli listnetworks
 - `/var/log/zt-syno-net-guard.log`: the root guard.
 - If Task Scheduler has no "zt-syno-net" task (for example you unticked the box during the
   install), create it by hand: Triggered Task > User-defined script, user `root`, event `Boot-up`,
-  command `/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-guard`, then Run. This variant
-  runs a package file as root: the automatic creation is preferable.
+  then Run. Use the command shown in the install wizard: it copies the launcher to `/run`, checks
+  its SHA-256 against this exact build and only then runs it, so root never runs a file the
+  package can change. The command changes with every build: after an upgrade, update the task.
+  The automatic creation does all of this for you.

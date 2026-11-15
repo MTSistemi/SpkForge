@@ -5,8 +5,8 @@ import { gunzipSync } from 'node:zlib';
 import { archMatches, parseInfo, readSpk, readTar, validateSpk } from '@spkforge/spk';
 import { buildSpk, type BuildTarget } from '../build.ts';
 import { renderIcon } from '../icon.ts';
-import { installWizard, upgradeWizard, uninstallWizard, SPKFORGE_GUARD } from '../wizard.ts';
-import { guardScript, taskOperation } from '../guard.ts';
+import { installWizard, upgradeWizard, uninstallWizard, SPKFORGE_GUARD, LAUNCHER_PATH } from '../wizard.ts';
+import { guardScript, manualCommand, taskOperation } from '../guard.ts';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -110,6 +110,13 @@ test('the boot-up task embeds the guard and stays under DSM limits', () => {
   assert.ok(!op.includes('%'), 'DSM rejects task commands containing a percent sign (error 117)');
   assert.ok(op.includes(guardScript(SPKFORGE_GUARD).trimEnd()), 'the guard text is inside the task, not read from the package');
   assert.match(op, /setsid \/bin\/sh \/run\/zt-syno-net-guard\.sh/);
+  const guard = guardScript(SPKFORGE_GUARD);
+  assert.ok(guard.includes(`tr '\\000' ' ' < "/proc/$old/cmdline"`), 'a guard of another build is replaced only after /proc confirms it is a guard');
+  assert.ok(guard.indexOf('kill "$old"') > guard.indexOf('/proc/$old/cmdline'));
+  for (const lang of ['enu', 'ita'] as const) {
+    const step = JSON.parse(upgradeWizard(lang))[0];
+    assert.ok(step.activate_v2.includes(JSON.stringify(op)), `${lang}: the task counts as up to date only with this exact command`);
+  }
 });
 
 test('shell scripts parse (sh -n)', { skip: spawnSync('sh', ['-c', 'exit 0']).status !== 0 && 'no sh' }, () => {
@@ -171,10 +178,26 @@ test('the DSM app is registered, served by DSM and admin-only', () => {
   const payload = readTar(gunzipSync(entries.find((e) => e.name === 'package.tgz')!.data));
   const byName = new Map(payload.map((e) => [e.name, e]));
   const config = JSON.parse(new TextDecoder().decode(byName.get('app/config')!.data));
-  const app = config['.url'][info.dsmappname!];
+  // DSM 7 opens "legacy"/"url" apps in a separate tab without the DSM session:
+  // the app must be a real DSM window.
+  const app = config['ZtSynoNet.js'][info.dsmappname!];
   assert.ok(app, 'dsmappname matches the app key in app/config');
+  assert.equal(app.type, 'app');
   assert.equal(app.allUsers, false);
-  assert.equal(app.url, '/webman/3rdparty/zt-syno-net/index.html');
+  assert.ok(config['ZtSynoNet.js'][app.appWindow], 'the app window is declared');
+  const windowJs = new TextDecoder().decode(byName.get('app/ZtSynoNet.js')!.data);
+  assert.doesNotThrow(() => new Function(windowJs));
+  assert.ok(windowJs.includes(`Ext.define('${info.dsmappname}'`), 'the app instance is defined');
+  assert.ok(windowJs.includes(`Ext.define('${app.appWindow}'`), 'the app window is defined');
+  // Every link carries the package version, so an upgrade is never served from the browser cache.
+  assert.ok(windowJs.includes(`src: '/webman/3rdparty/zt-syno-net/index.html?v=${info.version}'`));
+  assert.equal(app.version, info.version);
+  const html = new TextDecoder().decode(byName.get('app/index.html')!.data);
+  assert.ok(html.includes(`app.js?v=${info.version}`) && html.includes(`app.css?v=${info.version}`));
+  for (const e of payload) if (e.data) assert.ok(!new TextDecoder().decode(e.data).includes('@VERSION@'), `${e.name} still has a placeholder`);
+  for (const lang of ['enu', 'ita']) {
+    assert.match(new TextDecoder().decode(byName.get(`app/texts/${lang}/strings`)!.data), /^\[app\]\napp_name = "ZeroTier"/);
+  }
   for (const size of [16, 24, 32, 48, 64, 72, 256]) assert.ok(byName.has(`app/images/icon_${size}.png`), `icon ${size}`);
   for (const file of ['app/index.html', 'app/app.js', 'app/app.css']) assert.ok(byName.has(file), file);
   assert.equal(byName.get('app/cgi/api.cgi')?.mode, 0o755);
@@ -184,8 +207,10 @@ test('the DSM app is registered, served by DSM and admin-only', () => {
   assert.match(cgi, /\[ "\$\{REQUEST_METHOD\}" = "POST" \]/, 'join/leave only by POST');
   assert.match(cgi, /\^\[0-9a-f\]\{16\}\$/, 'network id validated');
   const resource = JSON.parse(new TextDecoder().decode(entries.find((e) => e.name === 'conf/resource')!.data));
-  assert.equal(resource.webservice.pkg_dir_prepare[0].source, '/var/packages/zt-syno-net/target/app');
-  assert.equal(resource.webservice.pkg_dir_prepare[0].target, 'zt-syno-net');
+  // dsmuidir alone publishes app/ under /webman/3rdparty/. A webservice section
+  // would make DSM restart its web server on every install and upgrade, which
+  // breaks the open DSM session (Package Center then fails with a script error).
+  assert.equal(resource.webservice, undefined);
 });
 
 test('the DSM app script parses and has both languages', () => {
@@ -194,6 +219,21 @@ test('the DSM app script parses and has both languages', () => {
   const keys = (lang: string) => [...js.matchAll(new RegExp(`${lang}: \\{([\\s\\S]*?)\\n    \\}`, 'g'))]
     .flatMap((m) => [...m[1]!.matchAll(/(\w+):\s*'/g)].map((k) => k[1]));
   assert.deepEqual(keys('ita').sort(), keys('enu').sort());
+});
+
+test('the manual setup runs only a verified root-owned copy of the launcher', () => {
+  const payload = readTar(gunzipSync(readTar(build().bytes).find((e) => e.name === 'package.tgz')!.data));
+  const launcher = payload.find((e) => e.name === 'bin/zt-syno-net-guard')!.data;
+  const sha = createHash('sha256').update(launcher).digest('hex');
+  const cmd = manualCommand(SPKFORGE_GUARD, LAUNCHER_PATH);
+  assert.ok(cmd.includes(`echo "${sha}  /run/zt-syno-net-launch.sh" | sha256sum -c --status && /bin/sh /run/zt-syno-net-launch.sh`));
+  assert.ok(!cmd.includes('%'), 'DSM refuses a percent sign in a task command');
+  assert.ok(!/\/bin\/sh \/var\/packages/.test(cmd), 'root never runs the package file in place');
+  for (const lang of ['enu', 'ita'] as const) {
+    const wizard = installWizard(lang);
+    assert.ok(wizard.includes(sha), `${lang} wizard shows the command of this build`);
+    assert.ok(!wizard.includes('@MANUAL_COMMAND@'));
+  }
 });
 
 test('builds are reproducible byte for byte', () => {

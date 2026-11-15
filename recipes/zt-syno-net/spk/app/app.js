@@ -11,13 +11,13 @@
       joinTitle: 'Join a network', networkId: 'Network ID', join: 'Join',
       joinHint: 'After joining, authorise this node in your network controller.',
       networksTitle: 'Joined networks', loading: 'Loading…', none: 'This NAS has not joined any network yet.',
-      leave: 'Leave', confirmLeave: 'Leave this network?', yes: 'Yes, leave', no: 'Cancel',
+      leave: 'Leave', confirmLeave: 'Leave? ZeroTier restarts: other networks pause for a few seconds.', yes: 'Yes, leave', no: 'Cancel',
       online: 'Online', offline: 'Offline', tunneled: 'Online (relayed)', down: 'Service stopped',
       ips: 'Addresses', noIp: 'no address yet', type: 'Type', mac: 'MAC',
       st_OK: 'Connected', st_ACCESS_DENIED: 'Waiting for authorisation', st_REQUESTING_CONFIGURATION: 'Connecting…',
       st_NOT_FOUND: 'Network not found', st_PORT_ERROR: 'Port error', st_CLIENT_TOO_OLD: 'Client too old',
       helpDenied: 'Authorise node {0} in the controller of this network.',
-      badId: 'A network ID is 16 hexadecimal characters.', joined: 'Joined {0}.', left: 'Left {0}.',
+      badId: 'A network ID is 16 hexadecimal characters.', joined: 'Joined {0}.', left: 'Left {0}. ZeroTier is restarting, back in a few seconds…',
       e_401: 'Your DSM session has expired: sign in again.', e_403: 'Only administrators can manage ZeroTier.',
       e_503: 'ZeroTier is not running. Check the package in Package Center.', e_net: 'Cannot reach the NAS.',
       e_generic: 'Something went wrong ({0}).'
@@ -28,20 +28,27 @@
       joinTitle: 'Unisciti a una rete', networkId: 'ID della rete', join: 'Unisciti',
       joinHint: 'Dopo esserti unito, autorizza questo nodo nel controller della rete.',
       networksTitle: 'Reti collegate', loading: 'Caricamento…', none: 'Questo NAS non è ancora collegato a nessuna rete.',
-      leave: 'Lascia', confirmLeave: 'Lasciare questa rete?', yes: 'Sì, lascia', no: 'Annulla',
+      leave: 'Lascia', confirmLeave: 'Lasciare la rete? ZeroTier si riavvia: le altre reti si fermano per qualche secondo.', yes: 'Sì, lascia', no: 'Annulla',
       online: 'Online', offline: 'Offline', tunneled: 'Online (via relay)', down: 'Servizio fermo',
       ips: 'Indirizzi', noIp: 'ancora nessun indirizzo', type: 'Tipo', mac: 'MAC',
       st_OK: 'Collegata', st_ACCESS_DENIED: 'In attesa di autorizzazione', st_REQUESTING_CONFIGURATION: 'Connessione…',
       st_NOT_FOUND: 'Rete inesistente', st_PORT_ERROR: 'Errore di porta', st_CLIENT_TOO_OLD: 'Client troppo vecchio',
       helpDenied: 'Autorizza il nodo {0} nel controller di questa rete.',
-      badId: 'Un ID di rete è composto da 16 caratteri esadecimali.', joined: 'Collegato a {0}.', left: 'Lasciata {0}.',
+      badId: 'Un ID di rete è composto da 16 caratteri esadecimali.', joined: 'Collegato a {0}.', left: 'Rete {0} lasciata. ZeroTier si sta riavviando, torna tra qualche secondo…',
       e_401: 'La sessione DSM è scaduta: accedi di nuovo.', e_403: 'Solo gli amministratori possono gestire ZeroTier.',
       e_503: 'ZeroTier non è in esecuzione. Controlla il pacchetto nel Centro pacchetti.', e_net: 'Il NAS non risponde.',
       e_generic: 'Qualcosa non è andato ({0}).'
     }
   };
 
-  function dsm() { try { return window.parent && window.parent.SYNO ? window.parent : null; } catch (e) { return null; } }
+  function dsm() { try { return window.parent && window.parent !== window && window.parent.SYNO ? window.parent : null; } catch (e) { return null; } }
+
+  // Opened on its own (bookmark, old link): reopen inside DSM, where the page
+  // gets the session's SynoToken.
+  if (!dsm()) {
+    window.location.replace('/?launchApp=SpkForge.ZtSynoNet.Instance');
+    return;
+  }
   function lang() {
     var p = dsm();
     var l = '';
@@ -127,7 +134,14 @@
     });
   }
 
+  // The periodic refresh rebuilds the list: hold it while a leave waits for
+  // confirmation, or the question would vanish under the user's pointer.
+  var confirming = false;
+  // After a leave zerotier-one restarts: errors in that window are expected.
+  var quietUntil = 0;
+
   function confirmLeave(side, n) {
+    confirming = true;
     side.textContent = '';
     side.appendChild(el('span', '', t('confirmLeave')));
     var yes = el('button', 'zt-btn zt-danger', t('yes'));
@@ -135,10 +149,10 @@
     yes.type = no.type = 'button';
     yes.addEventListener('click', function () {
       yes.disabled = no.disabled = true;
-      api('leave', 'POST', n.id).then(function () { say(t('left', n.name || n.id)); refresh(); })
-        .catch(function (err) { say(explain(err), true); refresh(); });
+      api('leave', 'POST', n.id).then(function () { confirming = false; quietUntil = Date.now() + 30000; say(t('left', n.name || n.id)); setTimeout(refresh, 20000); })
+        .catch(function (err) { confirming = false; say(explain(err), true); refresh(); });
     });
-    no.addEventListener('click', refresh);
+    no.addEventListener('click', function () { confirming = false; refresh(); });
     side.appendChild(yes);
     side.appendChild(no);
     yes.focus();
@@ -153,6 +167,7 @@
       renderNetworks(data.networks || []);
       if ($('message').className.indexOf('err') >= 0) { say(''); }
     }).catch(function (err) {
+      if (Date.now() < quietUntil) { return; }
       var pill = $('node-state');
       pill.textContent = err.status === 503 ? t('down') : '—';
       pill.className = 'zt-pill bad';
@@ -173,5 +188,5 @@
   });
 
   refresh();
-  setInterval(function () { if (!document.hidden) { refresh(); } }, 10000);
+  setInterval(function () { if (!document.hidden && !confirming) { refresh(); } }, 10000);
 })();

@@ -13,11 +13,31 @@ LOG_FILE="${HOME_DIR}/zt-syno-net.log"
 # Written by the root guard (root-owned, in /run): the identity of the binary
 # it granted the capability to. /bin/getcap is root-only on DSM, so this is
 # how the package user knows; after an install or upgrade it no longer matches
-# until the guard has done its job (within 30 seconds).
+# until the guard has done its job (within 30 seconds), so start waits for it.
 CAPS_MARK="/run/zt-syno-net.caps"
+GUARD_PID="/run/zt-syno-net-guard.pid"
+START_LOCK="${HOME_DIR}/start.lock"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "${LOG_FILE}"
+}
+
+# Log the error and hand it to Package Center, which shows the content of
+# SYNOPKG_TEMP_LOGFILE when start fails (without it DSM shows a script error).
+fail() {
+    log "ERROR: $*"
+    [ -n "${SYNOPKG_TEMP_LOGFILE}" ] && echo "$*" >> "${SYNOPKG_TEMP_LOGFILE}"
+    return 1
+}
+
+caps_ready() {
+    [ "$(stat -c '%i:%Y:%s' "${DAEMON}" 2>/dev/null)" = "$(cat "${CAPS_MARK}" 2>/dev/null)" ]
+}
+
+# The guard runs as root: kill -0 is not allowed on it, /proc is.
+guard_running() {
+    pid=$(cat "${GUARD_PID}" 2>/dev/null)
+    [ -n "${pid}" ] && [ -d "/proc/${pid}" ]
 }
 
 supervisor_running() {
@@ -28,21 +48,28 @@ supervisor_running() {
 
 prerequisites_ok() {
     if [ ! -x "${DAEMON}" ]; then
-        log "ERROR: no zerotier-one build for this CPU ($(uname -m)) in this package; install the universal or the matching package"
+        fail "No zerotier-one build for this CPU ($(uname -m)) in this package: install the universal package or the one for this CPU."
         return 1
     fi
     # Never let zerotier-one invent a new identity when one exists but cannot be
     # read: the node would come up under a new address, unknown to the network.
     if [ -e "${HOME_DIR}/identity.secret" ] && [ ! -r "${HOME_DIR}/identity.secret" ]; then
-        log "ERROR: ${HOME_DIR}/identity.secret is not readable by $(id -un); the guard fixes it within 30 seconds"
+        fail "${HOME_DIR}/identity.secret is not readable by $(id -un). The zt-syno-net guard fixes it within 30 seconds: start the package again then."
         return 1
     fi
     if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
-        log "ERROR: /dev/net/tun is not ready: is the zt-syno-net boot-up task present in Task Scheduler?"
+        fail "/dev/net/tun is not ready. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
         return 1
     fi
-    if [ "$(stat -c '%i:%Y:%s' "${DAEMON}" 2>/dev/null)" != "$(cat "${CAPS_MARK}" 2>/dev/null)" ]; then
-        log "ERROR: ${DAEMON} has no network capability yet: is the zt-syno-net boot-up task present in Task Scheduler?"
+    # After an install or upgrade the guard grants the capability on its next
+    # round: wait for it rather than fail the upgrade.
+    if ! caps_ready && guard_running; then
+        log "waiting for the guard to grant the network capability to ${DAEMON}"
+        i=0
+        while [ $i -lt 40 ] && ! caps_ready; do sleep 1; i=$((i + 1)); done
+    fi
+    if ! caps_ready; then
+        fail "ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
         return 1
     fi
     return 0
@@ -51,6 +78,20 @@ prerequisites_ok() {
 case "$1" in
     start)
         supervisor_running && exit 0
+        # The guard may start the package while DSM does: one start at a time.
+        if ! mkdir "${START_LOCK}" 2>/dev/null; then
+            # A lock older than two minutes is from a start that died.
+            if [ -n "$(find "${START_LOCK}" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then
+                rmdir "${START_LOCK}" 2>/dev/null; mkdir "${START_LOCK}" 2>/dev/null || exit 1
+            else
+                i=0
+                while [ $i -lt 60 ] && [ -d "${START_LOCK}" ]; do sleep 1; i=$((i + 1)); done
+                supervisor_running && exit 0
+                fail "Another start of ZeroTier did not finish. Try again."
+                exit 1
+            fi
+        fi
+        trap 'rmdir "${START_LOCK}" 2>/dev/null' EXIT
         prerequisites_ok || exit 1
         # A zerotier-one left behind by a supervisor that died hard would hold
         # the port: stop it first.
@@ -70,7 +111,7 @@ case "$1" in
             i=$((i + 1))
         done
         supervisor_running && exit 0
-        log "ERROR: the supervisor did not start"
+        fail "ZeroTier did not start: see ${LOG_FILE}."
         exit 1
         ;;
     stop)

@@ -12,6 +12,11 @@ SERVICE_COMMAND="/bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-supervise"
 SVC_BACKGROUND=y
 SVC_WRITE_PID=y
 
+zt_caps_ready ()
+{
+    [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" = "$(cat /run/zt-syno-net.caps 2>/dev/null)" ]
+}
+
 service_prestart ()
 {
     # Never let zerotier-one invent a new identity when one exists but cannot be
@@ -27,9 +32,17 @@ service_prestart ()
     fi
     # /bin/getcap is root-only on DSM, so the root guard records in /run the
     # binary it granted the capability to; after an install or upgrade the
-    # record no longer matches until the guard has run (within 30 seconds).
-    if [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" != "$(cat /run/zt-syno-net.caps 2>/dev/null)" ]; then
-        echo "ERROR: ${ZEROTIER} has no network capability yet: is the zt-syno-net boot-up task present in Task Scheduler?"
+    # record no longer matches until the guard has run (within 30 seconds):
+    # wait for it rather than fail the upgrade. The guard runs as root, so
+    # its liveness is checked through /proc, not kill -0.
+    guard_pid=$(cat /run/zt-syno-net-guard.pid 2>/dev/null)
+    if ! zt_caps_ready && [ -n "${guard_pid}" ] && [ -d "/proc/${guard_pid}" ]; then
+        echo "waiting for the guard to grant the network capability to ${ZEROTIER}"
+        i=0
+        while [ $i -lt 40 ] && ! zt_caps_ready; do sleep 1; i=$((i + 1)); done
+    fi
+    if ! zt_caps_ready; then
+        echo "ERROR: ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
         exit 1
     fi
     # A zerotier-one left behind by a supervisor that died hard would hold the

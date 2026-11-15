@@ -8,7 +8,7 @@
 // step's deactivate_v2 code when the admin presses Next. The password is wiped
 // from the form right after use, so it never reaches the package scripts.
 
-import { GUARD_VERSION, TASK_NAME, taskOperation, type GuardOptions } from './guard.ts';
+import { GUARD_VERSION, TASK_NAME, manualCommand, taskOperation, type GuardOptions } from './guard.ts';
 
 export type Lang = 'enu' | 'ita';
 
@@ -34,7 +34,12 @@ interface Texts {
   uninstallDesc: string;
 }
 
-const MANUAL_COMMAND = '/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-guard';
+/** Placeholder in manualSteps, replaced by manualCommand() for the package being built. */
+const MANUAL_COMMAND = '@MANUAL_COMMAND@';
+/** Where both builds (SpkForge and spksrc) install the manual launcher. */
+export const LAUNCHER_PATH = '/var/packages/zt-syno-net/target/bin/zt-syno-net-guard';
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const TEXTS: Record<Lang, Texts> = {
   enu: {
@@ -187,10 +192,12 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
 
 /**
  * Body of the step's activate_v2 handler: when the boot-up task already exists
- * with this guard version (an upgrade that does not change the guard), mark the
- * step done so Next goes straight on and no password is asked.
+ * with exactly this build's command (an upgrade that does not change the
+ * guard), mark the step done so Next goes straight on and no password is asked.
+ * The whole command is compared, not the version in the description, so any
+ * change to the guard updates the task.
  */
-export function checkTaskScript(lang: Lang): string {
+export function checkTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
   const t = TEXTS[lang];
   return `{
   var step = arguments[0], wizard = arguments[1];
@@ -200,7 +207,7 @@ export function checkTaskScript(lang: Lang): string {
       params: { task_name: ${JSON.stringify(TASK_NAME)} }, scope: step,
       callback: function (ok, found) {
         if (!ok || !found || found.task_name !== ${JSON.stringify(TASK_NAME)}) { return; }
-        if (found.description !== ${JSON.stringify(`zt-syno-net guard v${GUARD_VERSION}`)}) { return; }
+        if (found.operation !== ${JSON.stringify(taskOperation(guard))}) { return; }
         step.ztDone = true;
         var form = step.getForm();
         var box = form.findField('zt_create_task');
@@ -237,9 +244,12 @@ function guardStep(lang: Lang, guard: GuardOptions) {
       { desc: t.guardDesc },
       { type: 'multiselect', subitems: [{ key: 'zt_create_task', desc: t.guardCheckbox, defaultValue: true }] },
       { type: 'password', subitems: [{ key: 'zt_admin_password', desc: t.passwordLabel, defaultValue: '', validator: { allowBlank: true } }] },
-      { desc: `<b>${t.manualTitle}</b><br>${t.manualSteps.join('<br>')}` },
+      {
+        desc: `<b>${t.manualTitle}</b><br>${t.manualSteps.join('<br>')}`
+          .replace(MANUAL_COMMAND, `<code>${escapeHtml(manualCommand(guard, LAUNCHER_PATH))}</code>`),
+      },
     ],
-    activate_v2: checkTaskScript(lang),
+    activate_v2: checkTaskScript(lang, guard),
     deactivate_v2: createTaskScript(lang, guard),
   };
 }

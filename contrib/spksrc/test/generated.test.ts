@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generatedFiles } from '../generate.ts';
+import { generatedFiles, recipeVersion } from '../generate.ts';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'spk', 'zt-syno-net', 'src');
 
@@ -31,4 +31,16 @@ test('the spksrc package depends on no other package and runs as the package use
   assert.ok(guard.includes('echo "/var/packages/zt-syno-net/target/bin/zerotier-one"'));
   const wizard = JSON.parse(readFileSync(join(SRC, 'wizard', 'install_uifile_ita'), 'utf8'));
   assert.ok(wizard[1].deactivate_v2.includes('sc-zt-syno-net'), 'the task created by the wizard targets the spksrc user');
+});
+
+test('the spksrc package ships the same DSM app, versioned with SPK_VERS-SPK_REV', () => {
+  const makefile = readFileSync(join(SRC, '..', 'Makefile'), 'utf8');
+  assert.match(makefile, /^DSM_UI_DIR = app$/m);
+  assert.match(makefile, /^DSM_APP_NAME = SpkForge\.ZtSynoNet\.Instance$/m);
+  assert.match(makefile, /chmod 755 \$\(STAGING_DIR\)\/\$\(DSM_UI_DIR\)\/cgi\/api\.cgi/);
+  const version = recipeVersion();
+  const config = JSON.parse(readFileSync(join(SRC, 'app', 'config'), 'utf8'));
+  assert.equal(config['ZtSynoNet.js']['SpkForge.ZtSynoNet.Instance'].version, version);
+  assert.ok(readFileSync(join(SRC, 'app', 'index.html'), 'utf8').includes(`app.js?v=${version}`));
+  assert.ok(readFileSync(join(SRC, 'app', 'cgi', 'api.cgi'), 'utf8').includes('authenticate.cgi'));
 });
