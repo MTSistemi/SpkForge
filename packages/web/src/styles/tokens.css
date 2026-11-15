@@ -1,0 +1,59 @@
+/* Design tokens. One definition per token: light-dark() picks the side from the
+   color-scheme property, which follows the system or the stored choice. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Neutrals: warm paper by day, graphite by night. */
+  --bg: light-dark(#f3f1ec, #111417);
+  --bg-sunk: light-dark(#ebe8e1, #0c0e10);
+  --surface: light-dark(#fbfaf7, #161a1e);
+  --surface-2: light-dark(#f6f4ef, #1c2126);
+  --line: light-dark(#dcd8cf, #272d33);
+  --line-strong: light-dark(#bfbab0, #3a424a);
+  --ink: light-dark(#17191c, #ebe8e1);
+  --ink-2: light-dark(#363b41, #c5c9ce);
+  --muted: light-dark(#5b6168, #9aa1a9);
+
+  /* Ember: the heat of the forge. Text variant meets 4.5:1 on --bg and --surface. */
+  --ember: light-dark(#a94a19, #f28c4f);
+  --ember-fill: light-dark(#b4501d, #f08a4b);
+  --on-ember: light-dark(#ffffff, #1b0e06);
+  --ember-soft: color-mix(in oklab, var(--ember-fill) 12%, transparent);
+  --ember-line: color-mix(in oklab, var(--ember-fill) 45%, transparent);
+
+  /* Steel for the engraved plate. */
+  --steel-hi: light-dark(#eef0f2, #2e353c);
+  --steel-mid: light-dark(#d7dbdf, #232a30);
+  --steel-lo: light-dark(#c4c9ce, #1a1f24);
+  --steel-ink: light-dark(#22272c, #e4e1da);
+  --engrave-light: light-dark(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.07));
+  --engrave-dark: light-dark(rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.65));
+
+  /* Status. */
+  --ok: light-dark(#2f7a4f, #6cc08b);
+  --bad: light-dark(#b3261e, #ff8a80);
+  --warn: light-dark(#8a5d00, #e8b75a);
+
+  --shadow-1: 0 1px 0 light-dark(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.03)) inset,
+    0 1px 2px light-dark(rgb(40 30 20 / 0.06), rgb(0 0 0 / 0.4));
+  --shadow-2: 0 1px 0 light-dark(rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.04)) inset,
+    0 12px 32px -12px light-dark(rgb(40 30 20 / 0.22), rgb(0 0 0 / 0.7));
+
+  --font-display: 'Bricolage Grotesque Variable', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --radius-s: 4px;
+  --radius: 8px;
+  --radius-l: 14px;
+
+  --page: 72rem;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --header-h: 3.5rem;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }

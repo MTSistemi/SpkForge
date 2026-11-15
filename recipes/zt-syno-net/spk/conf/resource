@@ -1,5 +1,8 @@
 {
     "port-config": {
-        "protocol-file": "conf/zt-syno-net.sc"
+        "protocol-file": "app/zt-syno-net.sc"
+    },
+    "usr-local-linker": {
+        "bin": ["bin/zerotier-cli"]
     }
 }

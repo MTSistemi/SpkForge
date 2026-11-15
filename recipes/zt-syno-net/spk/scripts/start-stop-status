@@ -6,6 +6,7 @@
 
 . "/var/packages/zt-syno-net/target/bin/zt-syno-net-env"
 PID_FILE="${HOME_DIR}/zerotier-one.pid"
+CAPS_MARK="${HOME_DIR}/.caps-granted"
 LOG_FILE="${HOME_DIR}/zt-syno-net.log"
 
 log() {
@@ -23,12 +24,23 @@ prerequisites_ok() {
         log "ERROR: no zerotier-one build for this CPU ($(uname -m)) in this package; install the universal or the matching package"
         return 1
     fi
+    # Never let zerotier-one invent a new identity when one exists but cannot be
+    # read: the node would come up under a new address, unknown to the network.
+    if [ -e "${HOME_DIR}/identity.secret" ] && [ ! -r "${HOME_DIR}/identity.secret" ]; then
+        log "ERROR: ${HOME_DIR}/identity.secret exists but is not readable by $(id -un). Run the boot-up task (bin/zt-syno-net-setup) as root."
+        return 1
+    fi
     if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
         log "ERROR: /dev/net/tun missing or not writable. Run the boot-up task (bin/zt-syno-net-setup) as root."
         return 1
     fi
-    if ! /bin/getcap "${DAEMON}" 2>/dev/null | grep -q cap_net_admin; then
-        log "ERROR: ${DAEMON} has no CAP_NET_ADMIN (lost after install or upgrade). Run the boot-up task (bin/zt-syno-net-setup) as root."
+    # /bin/getcap is root-only on DSM (mode 0700), so the package user cannot
+    # check the capability itself. The setup task records the identity of the
+    # binary it granted CAP_NET_ADMIN to; an install or upgrade replaces the
+    # binary, the record no longer matches, and the start refuses with a clear
+    # message instead of a confusing network error.
+    if [ "$(stat -c '%i:%Y:%s' "${DAEMON}" 2>/dev/null)" != "$(cat "${CAPS_MARK}" 2>/dev/null)" ]; then
+        log "ERROR: ${DAEMON} has no CAP_NET_ADMIN yet (new install or upgrade). Run the boot-up task (bin/zt-syno-net-setup) as root."
         return 1
     fi
     return 0

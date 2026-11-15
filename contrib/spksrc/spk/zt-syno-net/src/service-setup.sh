@@ -13,13 +13,25 @@ SVC_WRITE_PID=y
 
 service_prestart ()
 {
+    # Never let zerotier-one invent a new identity when one exists but cannot be
+    # read: the node would come up under a new address, unknown to the network.
+    if [ -e "${SYNOPKG_PKGVAR}/identity.secret" ] && [ ! -r "${SYNOPKG_PKGVAR}/identity.secret" ]; then
+        echo "ERROR: ${SYNOPKG_PKGVAR}/identity.secret exists but is not readable by $(id -un)."
+        echo "Run the boot-up task once: /bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-setup (as root)"
+        exit 1
+    fi
     if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
         echo "ERROR: /dev/net/tun is missing or not writable."
         echo "Run the boot-up task once: /bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-setup (as root)"
         exit 1
     fi
-    if ! /bin/getcap "${ZEROTIER}" 2>/dev/null | grep -q cap_net_admin; then
-        echo "ERROR: ${ZEROTIER} has no CAP_NET_ADMIN (it is dropped on every install or upgrade)."
+    # /bin/getcap is root-only on DSM (mode 0700), so the package user cannot
+    # check the capability itself. The setup task records the identity of the
+    # binary it granted CAP_NET_ADMIN to; an install or upgrade replaces the
+    # binary, the record no longer matches, and the start refuses with a clear
+    # message instead of a confusing network error.
+    if [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" != "$(cat "${SYNOPKG_PKGVAR}/.caps-granted" 2>/dev/null)" ]; then
+        echo "ERROR: ${ZEROTIER} has no CAP_NET_ADMIN yet (new install or upgrade)."
         echo "Run the boot-up task once: /bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-setup (as root)"
         exit 1
     fi

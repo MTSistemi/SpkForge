@@ -22,4 +22,8 @@ test('the spksrc package depends on no other package and runs as the package use
   assert.doesNotMatch(makefile, /SPK_DEPENDS|INSTALL_DEP|SimplePermission/i);
   const setup = readFileSync(join(SRC, 'service-setup.sh'), 'utf8');
   assert.ok(setup.includes('SERVICE_COMMAND="${ZEROTIER} -U '), 'daemon must run with -U as the package user');
+  assert.doesNotMatch(setup.replace(/^\s*#.*$/gm, ''), /getcap|setcap/, 'getcap/setcap are root-only on DSM');
+  assert.ok(setup.includes('identity.secret" ] && [ ! -r'), 'must refuse to start with an unreadable identity');
+  const rootSetup = readFileSync(join(SRC, 'zt-syno-net-setup'), 'utf8');
+  assert.match(rootSetup, /^PKG_USER="sc-zt-syno-net"$/m);
 });

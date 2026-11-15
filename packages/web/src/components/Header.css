@@ -1,0 +1,135 @@
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  /* Opaque: nothing may show through while content scrolls underneath. */
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 6px 16px -14px rgb(0 0 0 / 0.5);
+}
+
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  height: var(--header-h);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+  flex: 0 1 auto;
+}
+.wordmark:hover { text-decoration: none; }
+.wordmark-glyph { width: 1.85rem; height: 1.85rem; color: var(--ink); }
+.wordmark-text {
+  font: 700 1.2rem/1 var(--font-display);
+  letter-spacing: -0.025em;
+}
+.wordmark-text span { color: var(--ember); }
+.wordmark-tag {
+  font: 500 0.6875rem/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  color: var(--muted);
+}
+
+.header-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-right: auto;
+}
+.header-nav a,
+.header-nav-mobile a {
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-s);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.header-nav a:hover,
+.header-nav-mobile a:hover { color: var(--ink); background: var(--surface-2); }
+
+.header-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Segmented switch: language and theme. */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.seg button {
+  min-width: 2rem;
+  height: 1.75rem;
+  padding: 0 0.45rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: 500 0.75rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.seg-icons button { display: inline-grid; place-items: center; min-width: 1.85rem; padding: 0; }
+.seg-icons svg { width: 0.95rem; height: 0.95rem; }
+
+.header-nav-mobile { display: none; }
+
+@media (max-width: 52rem) {
+  .header-nav { display: none; }
+  /* Not sticky: it scrolls away with the page, only the top bar stays. */
+  .header-nav-mobile {
+    display: block;
+    background-color: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-nav-mobile .wrap {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-block: 0.3rem;
+    scrollbar-width: none;
+  }
+  .header-nav-mobile a { flex: none; font-size: 0.85rem; padding-inline: 0.55rem; }
+}
+
+@media (max-width: 40rem) {
+  :root { --header-h: 3rem; }
+  .header-bar { gap: 0.75rem; }
+  .wordmark-glyph { width: 1.6rem; height: 1.6rem; }
+  .wordmark-text { font-size: 1.1rem; }
+  .header-tools .seg button { height: 1.6rem; min-width: 1.85rem; }
+  .header-tools .seg-icons button { min-width: 1.7rem; }
+}
+
+@media (max-width: 26rem) {
+  .header-tools { gap: 0.3rem; }
+  .header-tools > .icon-btn { display: none; }
+  .wordmark-tag { font-size: 0.5625rem; padding: 0.2rem 0.3rem; letter-spacing: 0.08em; }
+}
+
+@media (max-width: 23rem) {
+  /* 360 px and below: the admin tag would push the switches off screen. */
+  .wordmark-tag { display: none; }
+}

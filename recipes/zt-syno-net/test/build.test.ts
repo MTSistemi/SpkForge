@@ -79,6 +79,33 @@ test('control scripts are executable, privilege file runs as package user', () =
   assert.ok(!/spm-exec|SimplePermissionManager/.test(allText.replace(/not SPM|no privilege broker/g, '')));
 });
 
+test('package-user scripts use no root-only tools (getcap/setcap are mode 0700 on DSM)', () => {
+  const entries = readTar(build().bytes);
+  const startScript = new TextDecoder().decode(entries.find((e) => e.name === 'scripts/start-stop-status')!.data);
+  assert.doesNotMatch(startScript.replace(/^\s*#.*$/gm, ''), /getcap|setcap/);
+  assert.match(startScript, /caps-granted/);
+  assert.match(startScript, /identity\.secret" \] && \[ ! -r /, 'must refuse to start with an unreadable identity');
+});
+
+test('setup takes the owner from the package user, not from the data directory', () => {
+  const tgz = readTar(build().bytes).find((e) => e.name === 'package.tgz')!;
+  const setup = new TextDecoder().decode(readTar(gunzipSync(tgz.data)).find((e) => e.name === 'bin/zt-syno-net-setup')!.data);
+  assert.match(setup, /^PKG_USER="zt-syno-net"$/m);
+  assert.doesNotMatch(setup, /stat -c '%U:%G'/);
+  assert.ok(setup.includes('chown -RH "${owner}" "${HOME_DIR}"'), '-H: HOME_DIR is a symlink to the data volume');
+});
+
+test('firewall rule lives inside the payload, where conf/resource points', () => {
+  const entries = readTar(build().bytes);
+  const resource = JSON.parse(new TextDecoder().decode(entries.find((e) => e.name === 'conf/resource')!.data));
+  const protocolFile = resource['port-config']['protocol-file'] as string;
+  const payload = readTar(gunzipSync(entries.find((e) => e.name === 'package.tgz')!.data)).map((e) => e.name);
+  assert.ok(payload.includes(protocolFile), `${protocolFile} must be inside package.tgz`);
+  assert.deepEqual(resource['usr-local-linker'].bin, ['bin/zerotier-cli']);
+  assert.ok(payload.includes('bin/zerotier-cli'));
+  assert.ok(!entries.some((e) => e.name.endsWith('.sc')), 'no .sc at the SPK root');
+});
+
 test('builds are reproducible byte for byte', () => {
   assert.deepEqual(build().bytes, build().bytes);
 });

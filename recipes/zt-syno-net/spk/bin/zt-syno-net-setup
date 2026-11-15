@@ -40,7 +40,11 @@ die() {
 [ "$(id -u)" = "0" ] || die "must run as root (create the boot-up task with user root)"
 [ -x "${DAEMON}" ] || die "no zerotier-one build for this CPU ($(uname -m)) in the installed package"
 
-owner=$(stat -c '%U:%G' "${HOME_DIR}") || die "cannot read ${HOME_DIR}"
+# The package user from conf/privilege. Not taken from the data directory: right
+# after install that directory can still belong to root.
+PKG_USER="zt-syno-net"
+id -u "${PKG_USER}" >/dev/null 2>&1 || die "package user ${PKG_USER} does not exist"
+owner="${PKG_USER}:$(id -gn "${PKG_USER}")"
 
 # 1. tun
 if ! lsmod | grep -qw tun; then
@@ -57,6 +61,13 @@ if ! getcap "${DAEMON}" 2>/dev/null | grep -q cap_net_admin; then
     setcap cap_net_admin,cap_net_raw=ep "${DAEMON}" || die "setcap failed on ${DAEMON}"
     log "granted cap_net_admin,cap_net_raw to ${DAEMON}"
 fi
+# /bin/getcap is root-only on DSM (mode 0700), so the package user cannot
+# check the capability itself. The setup task records the identity of the
+# binary it granted CAP_NET_ADMIN to; an install or upgrade replaces the
+# binary, the record no longer matches, and the start refuses with a clear
+# message instead of a confusing network error.
+stat -c '%i:%Y:%s' "${DAEMON}" > "${HOME_DIR}/.caps-granted"
+
 
 # 3. one-time migration from an older ZeroTier package
 if [ ! -f "${HOME_DIR}/identity.secret" ]; then
@@ -75,15 +86,22 @@ if [ ! -f "${HOME_DIR}/identity.secret" ]; then
                 cp -p "${old}/${d}/"*.conf "${old}/${d}/"*.local.conf "${old}/${d}/"*.moon "${HOME_DIR}/${d}/" 2>/dev/null
             fi
         done
-        chown -R "${owner}" "${HOME_DIR}"
-        chmod 0600 "${HOME_DIR}/identity.secret"
         log "migrated identity $(cut -c1-10 "${HOME_DIR}/identity.public") from ${old}"
         break
     done
 fi
 
-# 4. start the package if DSM has it enabled
-if [ -f "/var/packages/${PKG}/enabled" ]; then
+# Every run: the data directory belongs to the package user (a reinstall can
+# give that user a new uid), and the identity stays private.
+chown -RH "${owner}" "${HOME_DIR}"  # -H: HOME_DIR is a symlink to /volume1/@appdata/<pkg>
+[ -f "${HOME_DIR}/identity.secret" ] && chmod 0600 "${HOME_DIR}/identity.secret"
+# The capability record stays root-owned: the package user may read it, not forge it.
+chown root:root "${HOME_DIR}/.caps-granted"
+chmod 0644 "${HOME_DIR}/.caps-granted"
+
+# 4. start the package if DSM has it enabled, or if its last start failed
+#    (first install: DSM tries to start it before this task has ever run).
+if [ -f "/var/packages/${PKG}/enabled" ] || synopkg status "${PKG}" 2>/dev/null | grep -q '"start_failed"'; then
     synopkg start "${PKG}" >/dev/null 2>&1 || log "synopkg start ${PKG} failed; see ${HOME_DIR}/zt-syno-net.log"
 fi
 

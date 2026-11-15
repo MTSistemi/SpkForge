@@ -94,6 +94,9 @@ export function buildSpk(options: BuildOptions): BuildResult {
     { name: 'bin/zt-syno-net-env', data: asset('bin/zt-syno-net-env'), mode: 0o644 },
     { name: 'bin/zerotier-cli', data: asset('bin/zerotier-cli'), mode: 0o755 },
     { name: 'bin/zt-syno-net-setup', data: asset('bin/zt-syno-net-setup'), mode: 0o755 },
+    // DSM 7 resolves resource paths inside the installed package (target/).
+    { name: 'app' },
+    { name: 'app/zt-syno-net.sc', data: asset('app/zt-syno-net.sc') },
   ]);
   const packageTgz = gzipSync(payload, { level: 9 });
 
@@ -132,7 +135,6 @@ export function buildSpk(options: BuildOptions): BuildResult {
     { name: 'conf' },
     { name: 'conf/privilege', data: asset('conf/privilege') },
     { name: 'conf/resource', data: asset('conf/resource') },
-    { name: 'conf/zt-syno-net.sc', data: asset('conf/zt-syno-net.sc') },
     { name: 'scripts' },
     { name: 'scripts/start-stop-status', data: asset('scripts/start-stop-status'), mode: 0o755 },
     { name: 'scripts/postinst', data: asset('scripts/postinst'), mode: 0o755 },

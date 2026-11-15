@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "spkforge-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["packages/server/src/main.ts"],
+      "env": { "SPKFORGE_DATA": ".demo-data", "SPKFORGE_PORT": "8080", "SPKFORGE_HOST": "127.0.0.1", "SPKFORGE_ADMIN_TOKEN": "demo-admin-token" },
+      "port": 8080
+    },
+    {
+      "name": "spkforge-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "@spkforge/web"],
+      "port": 5173
+    }
+  ]
+}
