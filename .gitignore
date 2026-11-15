@@ -11,3 +11,7 @@ coverage/
 
 # Local demo data for the web interface
 /.demo-data/
+
+# Server data of a local docker compose deployment
+/deploy/data/
+/deploy/.env

@@ -1,0 +1,30 @@
+# SpkForge behind a TLS reverse proxy (e.g. Nginx Proxy Manager).
+#
+#   cp .env.example .env    # set SPKFORGE_ADMIN_TOKEN and SPKFORGE_BASE_URL
+#   docker compose up -d --build
+#
+# Package files and the index live in ./data (back it up). Publish a package:
+#   curl -fT file.spk -H "Authorization: Bearer $SPKFORGE_ADMIN_TOKEN" \
+#        "$SPKFORGE_BASE_URL/api/admin/packages/file.spk"
+
+services:
+  spkforge:
+    build:
+      context: ..
+    image: spkforge:latest
+    container_name: spkforge
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPKFORGE_DATA: /data
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

@@ -1,4 +1,4 @@
-// Hero: the promise, the engraved source plate, the three DSM steps, the trust strip.
+// Home header: what this is, the source address, the three DSM steps, the package properties.
 
 import { useState } from 'react';
 import type { Info, Resource } from '../api.ts';
