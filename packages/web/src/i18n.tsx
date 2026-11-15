@@ -259,11 +259,11 @@ const it: Strings = {
   copy: { copy: 'Copia', copied: 'Copiato', failed: 'Selezionare e copiare', copyFull: 'Copia il valore completo', copiedFull: 'Copiato negli appunti' },
   steps: {
     title: 'Aggiunta della sorgente in DSM 7',
-    path: ['Centro pacchetti', 'Impostazioni', 'Origini pacchetti', 'Aggiungi'],
+    path: ['Centro pacchetti', 'Impostazioni', 'Pacchetti sorgente', 'Aggiungi'],
     s1t: 'Aprire il Centro pacchetti',
     s1d: 'Selezionare Impostazioni, in alto a destra.',
     s2t: 'Aggiungere una sorgente',
-    s2d: 'Nella scheda Origini pacchetti, selezionare Aggiungi.',
+    s2d: 'Nella scheda Pacchetti sorgente, selezionare Aggiungi.',
     s3t: 'Inserire nome e posizione',
     s3name: 'Nome',
     s3loc: 'Posizione',
