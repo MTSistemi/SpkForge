@@ -90,7 +90,12 @@ const TEXTS: Record<Lang, Texts> = {
   },
 };
 
-/** Body of the step's deactivate_v2 handler: "(step, wizard, action) { ... }". */
+/**
+ * Body of the step's deactivate_v2 handler. Package Center builds the function
+ * with eval(String.format("fn = function(){0};", body)) and calls it as
+ * fn(step, wizard, action): the body must be "{ ... }" alone, and the
+ * arguments are read from `arguments`.
+ */
 export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
   const t = TEXTS[lang];
   const task = {
@@ -106,7 +111,8 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     operation_type: 'script',
     operation: taskOperation(guard),
   };
-  return `(step, wizard, action) {
+  return `{
+  var step = arguments[0], wizard = arguments[1], action = arguments[2];
   var owner = step.owner || wizard;
   var title = ${JSON.stringify(t.guardTitle)};
   var show = function (text) {
@@ -167,7 +173,8 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
 
 /** Body of the uninstall step's deactivate_v2 handler: removes the boot-up task. */
 export function deleteTaskScript(): string {
-  return `(step, wizard, action) {
+  return `{
+  var step = arguments[0], wizard = arguments[1], action = arguments[2];
   if (action !== 'next' || step.ztDone) { return true; }
   step.ztDone = true;
   var call = { api: 'SYNO.Core.EventScheduler', method: 'delete', version: 1,

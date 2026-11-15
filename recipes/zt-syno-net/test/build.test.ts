@@ -131,7 +131,12 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
     const install = JSON.parse(installWizard(lang));
     const step = install[1];
     for (const [key, body] of [['create', step.deactivate_v2], ['delete', JSON.parse(uninstallWizard(lang))[0].deactivate_v2]] as const) {
-      assert.doesNotThrow(() => new Function(`return function${body}`), `${lang} ${key}`);
+      // Exactly how Package Center builds it: eval(String.format('fn = function(){0};', body)).
+      const source = 'fn = function(){0};'.replace('{0}', body);
+      let fn: unknown;
+      assert.doesNotThrow(() => { fn = new Function(`let fn; ${source} return fn;`)(); }, `${lang} ${key}`);
+      assert.equal(typeof fn, 'function', `${lang} ${key}`);
+      assert.ok(body.startsWith('{') && body.endsWith('}'), 'body only, no parameter list');
     }
     const body = step.deactivate_v2 as string;
     assert.ok(body.indexOf("pwField.setValue('')") < body.indexOf('var request'), 'password cleared before any request is built');
