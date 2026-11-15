@@ -1,0 +1,10 @@
+[
+  {
+    "step_title": "After the upgrade",
+    "items": [
+      {
+        "desc": "The upgrade replaces the ZeroTier binary and its permissions. Open Task Scheduler and run the zt-syno-net boot-up task once (/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup)."
+      }
+    ]
+  }
+]

@@ -1,0 +1,45 @@
+[
+  {
+    "step_title": "Rete ZeroTier",
+    "items": [
+      {
+        "type": "textfield",
+        "desc": "Facoltativo: l'ID di 16 caratteri della rete a cui collegarsi. Puoi collegarti anche dopo con zerotier-cli.",
+        "subitems": [
+          {
+            "key": "wizard_network_id",
+            "desc": "ID della rete",
+            "defaultValue": "",
+            "validator": {
+              "allowBlank": true,
+              "regex": {
+                "expr": "/^[0-9a-fA-F]{16}$/",
+                "errorText": "Un ID di rete è composto da 16 caratteri esadecimali"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "step_title": "Configurazione una tantum: attività all'avvio",
+    "items": [
+      {
+        "desc": "DSM 7 non permette ai pacchetti di terze parti di girare come root. zt-syno-net non ha bisogno di altri pacchetti per questo: un'attività all'avvio prepara il sistema e il servizio gira senza root."
+      },
+      {
+        "desc": "Pannello di controllo > Utilità di pianificazione > Crea > Attività attivata > Script definito dall'utente. Utente: root. Evento: Avvio."
+      },
+      {
+        "desc": "Comando da eseguire: /bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup"
+      },
+      {
+        "desc": "Salva, seleziona l'attività e premi Esegui una volta subito. Ripeti \"Esegui\" dopo ogni aggiornamento del pacchetto."
+      },
+      {
+        "desc": "Arrivi dal vecchio pacchetto \"zerotier\"? Disinstallalo prima: l'attività sposta qui la sua identità e le sue reti, così il node ID resta lo stesso."
+      }
+    ]
+  }
+]

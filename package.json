@@ -10,8 +10,8 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node --test \"packages/*/test/**/*.test.ts\" \"tools/**/*.test.ts\" \"recipes/**/*.test.ts\"",
-    "typecheck": "tsc -p packages/spk && tsc -p packages/server && tsc -p tools/dsm-source-audit && tsc -p recipes/zt-syno-net",
+    "test": "node --test \"packages/*/test/**/*.test.ts\" \"tools/**/*.test.ts\" \"recipes/**/*.test.ts\" \"contrib/**/*.test.ts\"",
+    "typecheck": "tsc -p packages/spk && tsc -p packages/server && tsc -p tools/dsm-source-audit && tsc -p recipes/zt-syno-net && tsc -p contrib/spksrc",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {

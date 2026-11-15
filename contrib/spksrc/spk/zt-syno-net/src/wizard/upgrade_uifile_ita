@@ -1,0 +1,10 @@
+[
+  {
+    "step_title": "Dopo l'aggiornamento",
+    "items": [
+      {
+        "desc": "L'aggiornamento sostituisce l'eseguibile di ZeroTier e i suoi permessi. Apri l'Utilità di pianificazione ed esegui una volta l'attività all'avvio di zt-syno-net (/bin/sh /var/packages/zt-syno-net/target/bin/zt-syno-net-setup)."
+      }
+    ]
+  }
+]
