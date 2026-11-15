@@ -150,14 +150,25 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
       pw = '';
       if (!ok || !res || !res.SynoConfirmPWToken) { fail(${JSON.stringify(t.badPassword)}, res); return; }
       task.SynoConfirmPWToken = res.SynoConfirmPWToken;
-      request('SYNO.Core.EventScheduler', 'get', 1, { task_name: task.task_name }, function (exists) {
+      // DSM answers get/set/run on a task that does not exist with success and no
+      // data, so "exists" means "get returned the task", and the result is checked
+      // with list at the end instead of trusting the success flags.
+      request('SYNO.Core.EventScheduler', 'get', 1, { task_name: task.task_name }, function (okGet, found) {
+        var exists = !!(okGet && found && found.task_name === task.task_name);
         if (exists) { task.old_task_name = task.task_name; }
         request('SYNO.Core.EventScheduler.Root', exists ? 'set' : 'create', 1, task, function (ok2, res2) {
           if (!ok2) { fail(${JSON.stringify(t.createFailed)}, res2); return; }
-          request('SYNO.Core.EventScheduler', 'run', 1, { task_name: task.task_name }, function () {
-            idle();
-            step.ztDone = true;
-            show(${JSON.stringify(t.created)});
+          request('SYNO.Core.EventScheduler', 'list', 1, {}, function (okList, tasks) {
+            var present = false;
+            if (okList && tasks && tasks.length) {
+              for (var i = 0; i < tasks.length; i++) { if (tasks[i].task_name === task.task_name) { present = true; } }
+            }
+            if (!present) { fail(${JSON.stringify(t.createFailed)}, res2); return; }
+            request('SYNO.Core.EventScheduler', 'run', 1, { task_name: task.task_name }, function () {
+              idle();
+              step.ztDone = true;
+              show(${JSON.stringify(t.created)});
+            });
           });
         });
       });

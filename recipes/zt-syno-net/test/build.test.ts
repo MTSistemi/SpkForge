@@ -146,6 +146,8 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
     assert.deepEqual(keys, ['zt_create_task', 'zt_admin_password']);
     assert.match(body, /owner\.sendWebAPI/, 'uses the wizard window WebAPI client first');
     assert.match(body, /catch \(e\)/, 'errors are shown, never swallowed');
+    assert.match(body, /found\.task_name === task\.task_name/, 'get succeeds even for a missing task: check its data');
+    assert.ok(body.indexOf("'list'") < body.indexOf("'run'"), 'verify the task exists before reporting success');
     assert.equal(JSON.parse(upgradeWizard(lang))[0].deactivate_v2, body);
   }
 });
