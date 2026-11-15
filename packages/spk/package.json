@@ -1,0 +1,12 @@
+{
+  "name": "@spkforge/spk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read Synology SPK packages: INFO, icons, file list, checksums.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "AGPL-3.0-or-later",
+  "author": "MTSistemi <info@mtsistemi.it>"
+}

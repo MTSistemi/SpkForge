@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.env
+/data/
+/var/
+coverage/
+
+# Local, never published: fleet host lists and notes
+/.local/

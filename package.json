@@ -1,0 +1,27 @@
+{
+  "name": "spkforge",
+  "private": true,
+  "description": "SpkForge: package source for Synology DSM 7, with web interface. By MTSistemi.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test \"packages/*/test/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "typecheck": "tsc -p packages/spk && tsc -p packages/server && tsc -p tools/dsm-source-audit",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "5.9"
+  },
+  "license": "AGPL-3.0-or-later",
+  "author": "MTSistemi <info@mtsistemi.it>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MTSistemi/SpkForge.git"
+  }
+}
