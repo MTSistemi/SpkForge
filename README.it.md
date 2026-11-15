@@ -2,7 +2,7 @@
 
 [English](README.md) | Italiano
 
-Una sorgente di pacchetti per Synology DSM 7, con interfaccia web, scritta da zero da MTSistemi.
+Una sorgente di pacchetti per Synology DSM 7, con interfaccia web, scritta da zero.
 Il primo pacchetto è ZeroTier, costruito dall'ultima release upstream.
 
 > Stato: sviluppo iniziale, non ancora utilizzabile.
