@@ -1,13 +1,13 @@
 // Package icon for zt-syno-net, drawn in code so the repository holds no
-// binary art and no third-party logo: three linked nodes on a teal rounded
-// square. Rendered with 4x supersampling and encoded as an RGBA PNG.
+// binary art and no third-party logo: three linked black nodes on a warm yellow
+// rounded square. Rendered with 4x supersampling and encoded as an RGBA PNG.
 
 import { crc32, deflateSync } from 'node:zlib';
 
 type Rgb = [number, number, number];
 
-const BACKGROUND: Rgb = [14, 116, 144];
-const FOREGROUND: Rgb = [255, 255, 255];
+const BACKGROUND: Rgb = [255, 189, 46];   // warm yellow
+const FOREGROUND: Rgb = [17, 17, 17];     // near black
 const SUPERSAMPLE = 4;
 
 function insideRoundedSquare(x: number, y: number, size: number, radius: number): boolean {
