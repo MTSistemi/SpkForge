@@ -32,6 +32,15 @@ service_prestart ()
         echo "ERROR: ${ZEROTIER} has no network capability yet: is the zt-syno-net boot-up task present in Task Scheduler?"
         exit 1
     fi
+    # A zerotier-one left behind by a supervisor that died hard would hold the
+    # port: stop it first.
+    orphan=$(cat "${SYNOPKG_PKGVAR}/zerotier-one.pid" 2>/dev/null)
+    if [ -n "${orphan}" ] && kill -0 "${orphan}" 2>/dev/null; then
+        echo "stopping leftover zerotier-one (pid ${orphan})"
+        kill "${orphan}" 2>/dev/null
+        sleep 5
+        kill -9 "${orphan}" 2>/dev/null
+    fi
 }
 
 service_postinst ()

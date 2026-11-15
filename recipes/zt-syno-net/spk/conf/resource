@@ -4,5 +4,21 @@
     },
     "usr-local-linker": {
         "bin": ["bin/zerotier-cli"]
+    },
+    "webservice": {
+        "services": [{
+            "service": "zt-syno-net",
+            "display_name": "ZeroTier",
+            "type": "static",
+            "root": "zt-syno-net",
+            "icon": "app/images/icon_{0}.png"
+        }],
+        "pkg_dir_prepare": [{
+            "source": "/var/packages/zt-syno-net/target/app",
+            "target": "zt-syno-net",
+            "mode": "0755",
+            "user": "zt-syno-net",
+            "group": "http"
+        }]
     }
 }

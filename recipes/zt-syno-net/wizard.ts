@@ -27,6 +27,7 @@ interface Texts {
   badPassword: string;
   createFailed: string;
   created: string;
+  alreadyDone: string;
   manualTitle: string;
   manualSteps: string[];
   uninstallTitle: string;
@@ -52,6 +53,7 @@ const TEXTS: Record<Lang, Texts> = {
     badPassword: 'DSM did not accept the password',
     createFailed: 'DSM did not create the task. Untick the box and follow the manual steps below.',
     created: 'Boot-up task created and started. Press Next to continue.',
+    alreadyDone: 'The boot-up task is already in place and up to date: nothing to do here, press Next.',
     manualTitle: 'Manual setup, only if you untick the box',
     manualSteps: [
       'Control Panel > Task Scheduler > Create > Triggered Task > User-defined script. User: root. Event: Boot-up.',
@@ -78,6 +80,7 @@ const TEXTS: Record<Lang, Texts> = {
     badPassword: 'DSM non ha accettato la password',
     createFailed: 'DSM non ha creato l\'attività. Togli la spunta e segui i passi manuali qui sotto.',
     created: 'Attività all\'avvio creata e avviata. Premi Avanti per continuare.',
+    alreadyDone: 'L\'attività all\'avvio c\'è già ed è aggiornata: qui non serve altro, premi Avanti.',
     manualTitle: 'Configurazione manuale, solo se togli la spunta',
     manualSteps: [
       'Pannello di controllo > Utilità di pianificazione > Crea > Attività attivata > Script definito dall\'utente. Utente: root. Evento: Avvio.',
@@ -182,6 +185,36 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
 }`;
 }
 
+/**
+ * Body of the step's activate_v2 handler: when the boot-up task already exists
+ * with this guard version (an upgrade that does not change the guard), mark the
+ * step done so Next goes straight on and no password is asked.
+ */
+export function checkTaskScript(lang: Lang): string {
+  const t = TEXTS[lang];
+  return `{
+  var step = arguments[0], wizard = arguments[1];
+  try {
+    var owner = step.owner || wizard;
+    var call = { api: 'SYNO.Core.EventScheduler', method: 'get', version: 1,
+      params: { task_name: ${JSON.stringify(TASK_NAME)} }, scope: step,
+      callback: function (ok, found) {
+        if (!ok || !found || found.task_name !== ${JSON.stringify(TASK_NAME)}) { return; }
+        if (found.description !== ${JSON.stringify(`zt-syno-net guard v${GUARD_VERSION}`)}) { return; }
+        step.ztDone = true;
+        var form = step.getForm();
+        var box = form.findField('zt_create_task');
+        var pwField = form.findField('zt_admin_password');
+        if (box) { box.setValue(false); box.disable(); }
+        if (pwField) { pwField.setValue(''); pwField.disable(); }
+        try { owner.getMsgBox().alert(${JSON.stringify(t.guardTitle)}, ${JSON.stringify(t.alreadyDone)}); } catch (ignore) {}
+      } };
+    if (owner.sendWebAPI) { owner.sendWebAPI(call); }
+    else if (window.SYNO && SYNO.API && SYNO.API.Request) { SYNO.API.Request(call); }
+  } catch (ignore) {}
+}`;
+}
+
 /** Body of the uninstall step's deactivate_v2 handler: removes the boot-up task. */
 export function deleteTaskScript(): string {
   return `{
@@ -206,6 +239,7 @@ function guardStep(lang: Lang, guard: GuardOptions) {
       { type: 'password', subitems: [{ key: 'zt_admin_password', desc: t.passwordLabel, defaultValue: '', validator: { allowBlank: true } }] },
       { desc: `<b>${t.manualTitle}</b><br>${t.manualSteps.join('<br>')}` },
     ],
+    activate_v2: checkTaskScript(lang),
     deactivate_v2: createTaskScript(lang, guard),
   };
 }

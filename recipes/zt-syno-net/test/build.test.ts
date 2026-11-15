@@ -8,7 +8,7 @@ import { renderIcon } from '../icon.ts';
 import { installWizard, upgradeWizard, uninstallWizard, SPKFORGE_GUARD } from '../wizard.ts';
 import { guardScript, taskOperation } from '../guard.ts';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -131,7 +131,7 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
   for (const lang of ['enu', 'ita'] as const) {
     const install = JSON.parse(installWizard(lang));
     const step = install[1];
-    for (const [key, body] of [['create', step.deactivate_v2], ['delete', JSON.parse(uninstallWizard(lang))[0].deactivate_v2]] as const) {
+    for (const [key, body] of [['create', step.deactivate_v2], ['check', step.activate_v2], ['delete', JSON.parse(uninstallWizard(lang))[0].deactivate_v2]] as const) {
       // Exactly how Package Center builds it: eval(String.format('fn = function(){0};', body)).
       const source = 'fn = function(){0};'.replace('{0}', body);
       let fn: unknown;
@@ -162,6 +162,38 @@ test('firewall rule lives inside the payload, where conf/resource points', () =>
   assert.deepEqual(resource['usr-local-linker'].bin, ['bin/zerotier-cli']);
   assert.ok(payload.includes('bin/zerotier-cli'));
   assert.ok(!entries.some((e) => e.name.endsWith('.sc')), 'no .sc at the SPK root');
+});
+
+test('the DSM app is registered, served by DSM and admin-only', () => {
+  const entries = readTar(build().bytes);
+  const info = parseInfo(new TextDecoder().decode(entries.find((e) => e.name === 'INFO')!.data));
+  assert.equal(info.dsmuidir, 'app');
+  const payload = readTar(gunzipSync(entries.find((e) => e.name === 'package.tgz')!.data));
+  const byName = new Map(payload.map((e) => [e.name, e]));
+  const config = JSON.parse(new TextDecoder().decode(byName.get('app/config')!.data));
+  const app = config['.url'][info.dsmappname!];
+  assert.ok(app, 'dsmappname matches the app key in app/config');
+  assert.equal(app.allUsers, false);
+  assert.equal(app.url, '/webman/3rdparty/zt-syno-net/index.html');
+  for (const size of [16, 24, 32, 48, 64, 72, 256]) assert.ok(byName.has(`app/images/icon_${size}.png`), `icon ${size}`);
+  for (const file of ['app/index.html', 'app/app.js', 'app/app.css']) assert.ok(byName.has(file), file);
+  assert.equal(byName.get('app/cgi/api.cgi')?.mode, 0o755);
+  const cgi = new TextDecoder().decode(byName.get('app/cgi/api.cgi')!.data);
+  assert.match(cgi, /authenticate\.cgi/);
+  assert.match(cgi, /administrators/);
+  assert.match(cgi, /\[ "\$\{REQUEST_METHOD\}" = "POST" \]/, 'join/leave only by POST');
+  assert.match(cgi, /\^\[0-9a-f\]\{16\}\$/, 'network id validated');
+  const resource = JSON.parse(new TextDecoder().decode(entries.find((e) => e.name === 'conf/resource')!.data));
+  assert.equal(resource.webservice.pkg_dir_prepare[0].source, '/var/packages/zt-syno-net/target/app');
+  assert.equal(resource.webservice.pkg_dir_prepare[0].target, 'zt-syno-net');
+});
+
+test('the DSM app script parses and has both languages', () => {
+  const js = readFileSync(new URL('../spk/app/app.js', import.meta.url), 'utf8');
+  assert.doesNotThrow(() => new Function(js));
+  const keys = (lang: string) => [...js.matchAll(new RegExp(`${lang}: \\{([\\s\\S]*?)\\n    \\}`, 'g'))]
+    .flatMap((m) => [...m[1]!.matchAll(/(\w+):\s*'/g)].map((k) => k[1]));
+  assert.deepEqual(keys('ita').sort(), keys('enu').sort());
 });
 
 test('builds are reproducible byte for byte', () => {

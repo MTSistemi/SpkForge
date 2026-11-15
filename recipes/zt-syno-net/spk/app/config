@@ -1,0 +1,14 @@
+{
+    ".url": {
+        "SpkForge.ZtSynoNet": {
+            "type": "legacy",
+            "allUsers": false,
+            "title": "ZeroTier",
+            "desc": "ZeroTier (zt-syno-net)",
+            "icon": "images/icon_{0}.png",
+            "url": "/webman/3rdparty/zt-syno-net/index.html",
+            "width": 900,
+            "height": 640
+        }
+    }
+}

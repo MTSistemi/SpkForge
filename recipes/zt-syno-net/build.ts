@@ -28,6 +28,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const FILES = join(HERE, 'spk');
 export const FAMILIES: readonly Family[] = ['x86_64', 'armv8', 'armv7', 'i686'];
 const LIFECYCLE_NOOP = ['preinst', 'preuninst', 'postuninst', 'preupgrade', 'postupgrade'];
+/** Sizes DSM asks for when it substitutes {0} in the app and service icon paths. */
+const APP_ICON_SIZES = [16, 24, 32, 48, 64, 72, 96, 128, 256];
+export const APP_NAME = 'SpkForge.ZtSynoNet';
 
 export const PACKAGE = 'zt-syno-net';
 
@@ -100,8 +103,17 @@ export function buildSpk(options: BuildOptions): BuildResult {
 ${taskOperation(SPKFORGE_GUARD)}
 `, mode: 0o755 },
     // DSM 7 resolves resource paths inside the installed package (target/).
+    // app/ is also the DSM app, served as /webman/3rdparty/zt-syno-net/.
     { name: 'app' },
     { name: 'app/zt-syno-net.sc', data: asset('app/zt-syno-net.sc') },
+    { name: 'app/config', data: asset('app/config') },
+    { name: 'app/index.html', data: asset('app/index.html') },
+    { name: 'app/app.js', data: asset('app/app.js') },
+    { name: 'app/app.css', data: asset('app/app.css') },
+    { name: 'app/cgi' },
+    { name: 'app/cgi/api.cgi', data: asset('app/cgi/api.cgi'), mode: 0o755 },
+    { name: 'app/images' },
+    ...APP_ICON_SIZES.map((size) => ({ name: `app/images/icon_${size}.png`, data: renderIcon(size) })),
   ]);
   const packageTgz = gzipSync(payload, { level: 9 });
 
@@ -113,9 +125,9 @@ ${taskOperation(SPKFORGE_GUARD)}
     displayname: 'ZeroTier (zt-syno-net)',
     displayname_enu: 'ZeroTier (zt-syno-net)',
     displayname_ita: 'ZeroTier (zt-syno-net)',
-    description: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root and needs no other package; a one-time boot-up task prepares the system (see the install wizard).`,
-    description_enu: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root and needs no other package; a one-time boot-up task prepares the system (see the install wizard).`,
-    description_ita: `ZeroTier One ${upstreamVersion}: collega questo NAS alle tue reti ZeroTier. Gira senza root e non richiede altri pacchetti; un'attività all'avvio, da creare una volta, prepara il sistema (vedi la procedura di installazione).`,
+    description: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root, needs no other package and restarts itself if it stops. The install wizard sets everything up.`,
+    description_enu: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root, needs no other package and restarts itself if it stops. The install wizard sets everything up.`,
+    description_ita: `ZeroTier One ${upstreamVersion}: collega questo NAS alle tue reti ZeroTier. Gira senza root, non richiede altri pacchetti e riparte da solo se si ferma. La procedura di installazione configura tutto.`,
     changelog: `ZeroTier One ${upstreamVersion}.`,
     changelog_ita: `ZeroTier One ${upstreamVersion}.`,
     maintainer: 'MTSistemi',
@@ -125,6 +137,8 @@ ${taskOperation(SPKFORGE_GUARD)}
     support_url: 'https://github.com/MTSistemi/SpkForge/issues',
     helpurl: 'https://github.com/MTSistemi/SpkForge/blob/main/docs/en/zt-syno-net.md',
     install_conflict_packages: 'zerotier',
+    dsmuidir: 'app',
+    dsmappname: APP_NAME,
     thirdparty: 'yes',
     ctl_stop: 'yes',
     checksum: createHash('md5').update(packageTgz).digest('hex'),

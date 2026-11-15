@@ -52,6 +52,16 @@ case "$1" in
     start)
         supervisor_running && exit 0
         prerequisites_ok || exit 1
+        # A zerotier-one left behind by a supervisor that died hard would hold
+        # the port: stop it first.
+        orphan=$(cat "${HOME_DIR}/zerotier-one.pid" 2>/dev/null)
+        if [ -n "${orphan}" ] && kill -0 "${orphan}" 2>/dev/null; then
+            log "stopping leftover zerotier-one (pid ${orphan})"
+            kill "${orphan}" 2>/dev/null
+            i=0
+            while [ $i -lt 20 ] && kill -0 "${orphan}" 2>/dev/null; do sleep 0.5; i=$((i + 1)); done
+            kill -9 "${orphan}" 2>/dev/null
+        fi
         setsid /bin/sh "${SUPERVISOR}" </dev/null >/dev/null 2>&1 &
         i=0
         while [ $i -lt 30 ]; do
