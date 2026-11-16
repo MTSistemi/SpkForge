@@ -2,7 +2,7 @@
     "ZtSynoNet.js": {
         "SpkForge.ZtSynoNet.Instance": {
             "type": "app",
-            "version": "1.16.2-2",
+            "version": "1.16.2-3",
             "title": "app:app_name",
             "desc": "app:description",
             "icon": "images/icon_{0}.png",
@@ -14,7 +14,7 @@
         },
         "SpkForge.ZtSynoNet.MainWindow": {
             "type": "lib",
-            "version": "1.16.2-2",
+            "version": "1.16.2-3",
             "title": "app:app_name",
             "icon": "images/icon_{0}.png",
             "texts": "texts",

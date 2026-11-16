@@ -39,8 +39,12 @@ L'attività "zt-syno-net" avvia un piccolo guardiano che:
 
 - ogni 5 secondi carica il modulo `tun` e dà `CAP_NET_ADMIN` all'eseguibile di ZeroTier, anche
   **dopo ogni aggiornamento** (così un aggiornamento ferma ZeroTier solo per pochi secondi);
-- ogni 30 secondi sposta una volta sola l'identità di un vecchio pacchetto ZeroTier;
-- avvia il pacchetto se DSM lo vuole acceso ed è fermo.
+- sposta una volta sola l'identità e le reti di un vecchio pacchetto ZeroTier, appena quel
+  ZeroTier non è più in esecuzione. Fino ad allora il pacchetto non parte: uno ZeroTier senza la
+  vecchia identità ne creerebbe una nuova, e il nodo comparirebbe con un indirizzo sconosciuto
+  alle sue reti. Se il vecchio ZeroTier è ancora acceso, l'avvio del pacchetto fallisce con un
+  messaggio che lo spiega;
+- ogni 30 secondi avvia il pacchetto se DSM lo vuole acceso ed è fermo.
 
 Il testo del guardiano sta **dentro l'attività**, conservata da DSM come root: root non esegue mai
 file che il pacchetto può modificare. Dentro il pacchetto, un supervisore senza privilegi riavvia

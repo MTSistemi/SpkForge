@@ -16,6 +16,11 @@ LOG_FILE="${HOME_DIR}/zt-syno-net.log"
 # until the guard has done its job (within 30 seconds), so start waits for it.
 CAPS_MARK="/run/zt-syno-net.caps"
 GUARD_PID="/run/zt-syno-net-guard.pid"
+# Written by the guard while the identity of an older ZeroTier package is
+# still to be moved here. Starting before that would make zerotier-one create
+# a new identity: the node would come up under an address its networks do not
+# know, and the migration would never happen.
+MIGRATING="/run/zt-syno-net.migrating"
 START_LOCK="${HOME_DIR}/start.lock"
 
 log() {
@@ -72,7 +77,20 @@ prerequisites_ok() {
         fail "ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
         return 1
     fi
+    if migration_pending; then
+        log "waiting for the guard to move over the identity of the previous ZeroTier package"
+        i=0
+        while [ $i -lt 40 ] && migration_pending; do sleep 1; i=$((i + 1)); done
+    fi
+    if migration_pending; then
+        fail "The identity of the previous ZeroTier package has not been moved over yet, because that ZeroTier is still running. Stop it (or uninstall it: its data is kept), then start this package again."
+        return 1
+    fi
     return 0
+}
+
+migration_pending() {
+    [ -e "${MIGRATING}" ] && [ ! -e "${HOME_DIR}/identity.secret" ]
 }
 
 case "$1" in

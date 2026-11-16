@@ -104,6 +104,80 @@ test('the root guard never follows symlinks or recurses into package-owned paths
   assert.ok(guard.indexOf('chmod 0700 "$d"') < guard.indexOf('setcap cap_net_admin'), 'only the package user may run the capable binary');
 });
 
+test('the package never starts while an old identity waits to be migrated', () => {
+  const guard = guardScript(SPKFORGE_GUARD);
+  assert.match(guard, /^MIGRATING="\/run\/\$PKG\.migrating"$/m);
+  // Matched on process name and executable: the shell running the boot-up task
+  // has the whole guard text, "zerotier-one" included, on its command line.
+  assert.match(guard, /for c in \/proc\/\[0-9\]\*\/comm; do/);
+  assert.doesNotMatch(guard, /ps -eo args/);
+  assert.match(guard, /ensure_running\(\) \{[\s\S]*?\[ -e "\$MIGRATING" \] && return[\s\S]*?synopkg start/);
+  const loop = guard.slice(guard.indexOf('while :; do'));
+  assert.ok(loop.indexOf('migrate') < loop.indexOf('ensure_caps'), 'the marker exists before the capability lets the package start');
+  const sss = readFileSync(new URL('../spk/scripts/start-stop-status', import.meta.url), 'utf8');
+  assert.match(sss, /^MIGRATING="\/run\/zt-syno-net\.migrating"$/m);
+  assert.ok(sss.indexOf('migration_pending; then') > sss.indexOf('caps_ready; then'), 'start checks the migration after the capability');
+});
+
+test('guard behaviour: migrates past a task shell, waits for a real zerotier-one', { skip: process.platform !== 'linux' && 'needs Linux /proc' }, async () => {
+  const root = mkdtempSync(join(tmpdir(), 'zt-guard-'));
+  const user = spawnSync('id', ['-un']).stdout.toString().trim();
+  const sh = (cmd: string) => spawnSync('sh', ['-c', cmd], { stdio: 'pipe' });
+  const pkg = join(root, 'pkg');
+  const daemon = join(pkg, 'target/bin/zerotier-one');
+  sh(`mkdir -p ${pkg}/target/bin ${pkg}/var ${root}/old/networks.d ${root}/run ${root}/stub ${root}/fake
+      touch ${pkg}/INFO ${pkg}/enabled; cp "$(command -v sleep)" ${daemon}
+      printf 'pub' > ${root}/old/identity.public; printf 'sec' > ${root}/old/identity.secret
+      : > ${root}/old/networks.d/0123456789abcdef.conf
+      cp "$(command -v sleep)" ${root}/fake/zerotier-one`);
+  const stub = (name: string, body: string) => {
+    writeFileSync(join(root, 'stub', name), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  };
+  stub('synopkg', `echo "$*" >> ${root}/synopkg.calls; echo '{"status":"stop"}'`);
+  stub('setcap', 'exit 0');
+  stub('getcap', 'echo "$1 cap_net_admin,cap_net_raw=ep"');
+  stub('lsmod', 'echo tun');
+  for (const t of ['insmod', 'modprobe', 'mknod']) stub(t, 'exit 0');
+  const script = guardScript({ pkg: 'zt-syno-net', user, daemon })
+    .replace('PKG_DIR="/var/packages/$PKG"', `PKG_DIR="${pkg}"`)
+    .replace(/^OLD_DIRS=.*$/m, `OLD_DIRS="${root}/old"`)
+    .replace(/"\/run\//g, `"${root}/run/`)
+    .replace(/^LOG=.*$/m, `LOG="${root}/guard.log"`)
+    .replace(/^export PATH=.*$/m, `export PATH=${root}/stub:$PATH`);
+  writeFileSync(join(root, 'guard.sh'), script);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const { spawn } = await import('node:child_process');
+  const procs: Array<ReturnType<typeof spawn>> = [];
+  const run = (cmd: string, args: string[]) => { const p = spawn(cmd, args, { stdio: 'ignore' }); procs.push(p); return p; };
+  try {
+    // 1. Only a shell whose command line mentions zerotier-one (the task runner): migrate at once.
+    run('sh', ['-c', 'sleep 20 # cat > /run/zt-syno-net-guard.sh ... zerotier-one-x86_64 ...']);
+    const g1 = run('sh', [join(root, 'guard.sh')]);
+    await wait(1500);
+    assert.equal(readFileSync(join(pkg, 'var/identity.secret'), 'utf8'), 'sec', 'migrated despite the task shell');
+    assert.equal(sh(`test -f ${pkg}/var/networks.d/0123456789abcdef.conf`).status, 0, 'networks moved too');
+    assert.equal(sh(`test -e ${root}/run/zt-syno-net.migrating`).status, 1, 'no marker after the migration');
+    g1.kill('SIGKILL');
+    // 2. A real other zerotier-one runs: the guard waits, keeps the marker and does not start the package.
+    sh(`rm -rf ${pkg}/var/* ${root}/synopkg.calls ${root}/run/*`);
+    const other = run(join(root, 'fake/zerotier-one'), ['30']);
+    run('sh', [join(root, 'guard.sh')]);
+    await wait(1500);
+    assert.equal(sh(`test -e ${pkg}/var/identity.secret`).status, 1, 'no migration while the old daemon runs');
+    assert.equal(sh(`test -e ${root}/run/zt-syno-net.migrating`).status, 0, 'marker tells the package to wait');
+    const calls = sh(`cat ${root}/synopkg.calls 2>/dev/null`).stdout.toString();
+    assert.doesNotMatch(calls, /start/, 'the guard does not start the package while the migration waits');
+    other.kill('SIGKILL');
+    await wait(6500);
+    assert.equal(readFileSync(join(pkg, 'var/identity.secret'), 'utf8'), 'sec', 'migrated once the old daemon stopped');
+    assert.equal(sh(`test -e ${root}/run/zt-syno-net.migrating`).status, 1, 'marker removed');
+    assert.equal(sh(`grep -c 'migration waits' ${root}/guard.log`).stdout.toString().trim(), '1', 'the wait is logged once');
+  } finally {
+    for (const p of procs) p.kill('SIGKILL');
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('the boot-up task embeds the guard and stays under DSM limits', () => {
   const op = taskOperation(SPKFORGE_GUARD);
   assert.ok(op.length < 8192, `task command is ${op.length} characters, DSM allows 8192`);

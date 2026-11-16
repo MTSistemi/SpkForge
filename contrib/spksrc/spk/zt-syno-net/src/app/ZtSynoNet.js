@@ -27,7 +27,7 @@ Ext.define('SpkForge.ZtSynoNet.MainWindow', {
                 xtype: 'box',
                 autoEl: {
                     tag: 'iframe',
-                    src: '/webman/3rdparty/zt-syno-net/index.html?v=1.16.2-2',
+                    src: '/webman/3rdparty/zt-syno-net/index.html?v=1.16.2-3',
                     title: 'ZeroTier',
                     frameborder: 0,
                     style: 'border:0;width:100%;height:100%;display:block;background:#fff'

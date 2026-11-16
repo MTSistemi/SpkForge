@@ -17,6 +17,11 @@ zt_caps_ready ()
     [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" = "$(cat /run/zt-syno-net.caps 2>/dev/null)" ]
 }
 
+zt_migration_pending ()
+{
+    [ -e /run/zt-syno-net.migrating ] && [ ! -e "${SYNOPKG_PKGVAR}/identity.secret" ]
+}
+
 service_prestart ()
 {
     # Never let zerotier-one invent a new identity when one exists but cannot be
@@ -43,6 +48,18 @@ service_prestart ()
     fi
     if ! zt_caps_ready; then
         echo "ERROR: ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
+        exit 1
+    fi
+    # While the guard still has to move over the identity of an older ZeroTier
+    # package it keeps /run/zt-syno-net.migrating. Starting now would make
+    # zerotier-one create a new identity, unknown to the node's networks.
+    if zt_migration_pending; then
+        echo "waiting for the guard to move over the identity of the previous ZeroTier package"
+        i=0
+        while [ $i -lt 40 ] && zt_migration_pending; do sleep 1; i=$((i + 1)); done
+    fi
+    if zt_migration_pending; then
+        echo "ERROR: the identity of the previous ZeroTier package has not been moved over yet, because that ZeroTier is still running. Stop it (or uninstall it: its data is kept), then start this package again."
         exit 1
     fi
     # A zerotier-one left behind by a supervisor that died hard would hold the

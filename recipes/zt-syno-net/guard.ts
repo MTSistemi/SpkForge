@@ -18,11 +18,14 @@ import { createHash } from 'node:crypto';
 //
 // Every 5 seconds the guard (cheap checks, so an upgrade waits seconds, not half
 // a minute, for the capability; ZeroTier is down meanwhile):
+//   - migrates the identity of an older ZeroTier package once, as soon as no
+//     other zerotier-one runs; while it waits, /run/<pkg>.migrating exists and
+//     the package must not start (zerotier-one would create a new identity, and
+//     the node would come up under an address unknown to its networks);
 //   - loads tun and makes /dev/net/tun usable;
 //   - grants CAP_NET_ADMIN/CAP_NET_RAW to the package's zerotier-one when it is
 //     new (install, upgrade) and records it in /run/<pkg>.caps for the package.
 // Every 30 seconds it also:
-//   - migrates the identity of an older ZeroTier package once;
 //   - keeps the identity owned by the package user;
 //   - starts the package when DSM wants it running and it is not.
 
@@ -35,7 +38,7 @@ export interface GuardOptions {
   daemon: 'per-family' | string;
 }
 
-export const GUARD_VERSION = 2;
+export const GUARD_VERSION = 3;
 export const TASK_NAME = 'zt-syno-net';
 const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
 
@@ -63,6 +66,7 @@ MARK="/run/$PKG.caps"
 LOG="/var/log/$PKG-guard.log"
 PIDF="/run/$PKG-guard.pid"
 VERF="/run/$PKG-guard.ver"
+MIGRATING="/run/$PKG.migrating"
 OLD_DIRS="/var/packages/zerotier/var /volume1/@appdata/zerotier"
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin
 # A literal percent sign is not allowed in a DSM task command: build it.
@@ -103,14 +107,34 @@ ensure_caps() {
     fi
 }
 
+# A zerotier-one process other than this package's own. Matched on the
+# process name and the executable, never on command lines: the shell running
+# the boot-up task carries the whole guard text, "zerotier-one" included.
+other_daemon() {
+    # /proc/<pid>/exe is the resolved path; target/ is a symlink to @appstore.
+    d=$(readlink -f "$(daemon_path)")
+    for c in /proc/[0-9]*/comm; do
+        case "$(cat "$c" 2>/dev/null)" in zerotier-one*) ;; *) continue ;; esac
+        [ "$(readlink "$(dirname "$c")/exe" 2>/dev/null)" = "$d" ] && continue
+        return 0
+    done
+    return 1
+}
+
+WAIT_LOGGED=0
 migrate() {
-    [ -e "$HOME_DIR/identity.secret" ] && return
+    if [ -e "$HOME_DIR/identity.secret" ]; then rm -f "$MIGRATING"; return; fi
+    pending=0
+    for old in $OLD_DIRS; do plain_file "$old/identity.secret" && pending=1; done
+    if [ "$pending" = 0 ]; then rm -f "$MIGRATING"; return; fi
+    # Tell the package not to start yet (see the header).
+    [ -e "$MIGRATING" ] || { : > "$MIGRATING"; chmod 0644 "$MIGRATING"; }
     g=$(id -gn "$PKG_USER") || return
-    d=$(daemon_path)
     for old in $OLD_DIRS; do
         plain_file "$old/identity.secret" || continue
-        if ps -eo args | grep '[z]erotier-one' | grep -v "^$d" | grep -q .; then
-            log "migration waits: another zerotier-one is running with an identity"
+        if other_daemon; then
+            [ "$WAIT_LOGGED" = 1 ] || log "migration waits: another zerotier-one is running with an identity"
+            WAIT_LOGGED=1
             return
         fi
         install -o "$PKG_USER" -g "$g" -m 0644 "$old/identity.public" "$HOME_DIR/identity.public"
@@ -124,6 +148,8 @@ migrate() {
             done
         done
         log "migrated identity $(cut -c1-10 "$HOME_DIR/identity.public") from $old"
+        rm -f "$MIGRATING"
+        WAIT_LOGGED=0
         return
     done
 }
@@ -144,6 +170,7 @@ LAST_START=0
 ensure_running() {
     st=$(synopkg status "$PKG" 2>/dev/null)
     case "$st" in *'"status":"running"'*) return ;; esac
+    [ -e "$MIGRATING" ] && return
     [ -f "$PKG_DIR/enabled" ] || echo "$st" | grep -q '"start_failed"' || return
     now=$(date "+\${P}s")
     [ $((now - LAST_START)) -lt 60 ] && return
@@ -171,12 +198,14 @@ round=6
 while :; do
     if installed; then
         absent=0
+        # Before the capability: the package waits for it, so by the time it
+        # may start the migration marker is already in place.
+        migrate
         ensure_tun
         ensure_caps
         round=$((round + 1))
         if [ "$round" -ge 6 ]; then
             round=0
-            migrate
             ensure_owner
             ensure_running
         fi

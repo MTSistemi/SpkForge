@@ -1,6 +1,6 @@
 SPK_NAME = zt-syno-net
 SPK_VERS = 1.16.2
-SPK_REV = 2
+SPK_REV = 3
 SPK_ICON = src/zt-syno-net.png
 
 DEPENDS = cross/zerotier
@@ -11,7 +11,7 @@ MAINTAINER = MTSistemi
 DESCRIPTION = ZeroTier One: join this NAS to your ZeroTier networks. Runs without root, needs no other package and restarts itself if it stops. The install wizard sets everything up.
 DESCRIPTION_ITA = ZeroTier One: collega questo NAS alle tue reti ZeroTier. Gira senza root, non richiede altri pacchetti e riparte da solo se si ferma. La procedura di installazione configura tutto.
 DISPLAY_NAME = ZeroTier
-CHANGELOG = "1. ZeroTier One 1.16.2. 2. The install wizard creates the root boot-up task itself, and a supervisor restarts the service if it stops. 3. A DSM app for administrators shows the node and joins or leaves networks."
+CHANGELOG = "1. ZeroTier One 1.16.2. 2. The install wizard creates the root boot-up task itself, and a supervisor restarts the service if it stops. 3. A DSM app for administrators shows the node and joins or leaves networks. 4. The identity of a previous ZeroTier package is always kept: the service waits for it to be moved over instead of starting with a new one."
 HOMEPAGE = https://www.zerotier.com
 LICENSE = MPL-2.0
 STARTABLE = yes

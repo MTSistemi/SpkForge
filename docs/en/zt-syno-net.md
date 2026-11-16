@@ -38,8 +38,11 @@ guard that:
 
 - every 5 seconds loads the `tun` module and grants `CAP_NET_ADMIN` to the ZeroTier binary, also
   **after every upgrade** (so an upgrade interrupts ZeroTier for a few seconds only);
-- every 30 seconds moves the identity of an older ZeroTier package, once;
-- starts the package when DSM wants it running and it is not.
+- moves the identity and networks of an older ZeroTier package, once, as soon as that ZeroTier is
+  no longer running. Until then the package does not start: a ZeroTier without the old identity
+  would create a new one, and the node would come up under an address its networks do not know.
+  If the old ZeroTier is still running, starting the package fails with a message saying so;
+- every 30 seconds starts the package when DSM wants it running and it is not.
 
 The guard's text lives **inside the task**, which DSM keeps root-owned: root never runs a file the
 package can modify. Inside the package, an unprivileged supervisor restarts ZeroTier when it stops
