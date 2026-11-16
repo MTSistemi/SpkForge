@@ -81,26 +81,26 @@ const TEXTS: Record<Lang, Texts> = {
   },
   ita: {
     networkTitle: 'Rete ZeroTier',
-    networkDesc: 'Facoltativo: l\'ID di 16 caratteri della rete a cui collegarsi. Puoi collegarti anche dopo con zerotier-cli.',
+    networkDesc: 'Facoltativo: l\'ID di 16 caratteri della rete a cui collegare il NAS. Il collegamento si può fare anche dopo, dall\'app ZeroTier o con zerotier-cli.',
     networkLabel: 'ID della rete',
     networkError: 'Un ID di rete è composto da 16 caratteri esadecimali',
-    guardTitle: 'Avvio automatico e guardia',
+    guardTitle: 'Avvio automatico e guardiano',
     guardDesc: 'DSM 7 non permette ai pacchetti di terze parti di girare come root, e ZeroTier ha bisogno di un '
       + 'permesso di rete. zt-syno-net lo risolve senza altri pacchetti: crea una sola attività all\'avvio, eseguita '
       + 'da root, che prepara il sistema, dà a ZeroTier il permesso dopo ogni installazione o aggiornamento e fa '
-      + 'ripartire il servizio se si ferma. DSM chiede la tua password per creare un\'attività che gira come root.',
-    guardCheckbox: 'Crea adesso l\'attività all\'avvio (consigliato)',
-    passwordLabel: 'La tua password di DSM',
-    passwordNeeded: 'Inserisci la password, oppure togli la spunta per configurarla a mano',
+      + 'ripartire il servizio se si ferma. Per creare un\'attività eseguita da root, DSM richiede la password dell\'amministratore.',
+    guardCheckbox: 'Creare adesso l\'attività all\'avvio (consigliato)',
+    passwordLabel: 'Password DSM dell\'amministratore',
+    passwordNeeded: 'Serve la password, oppure va tolta la spunta per la configurazione manuale',
     badPassword: 'DSM non ha accettato la password',
-    createFailed: 'DSM non ha creato l\'attività. Togli la spunta e segui i passi manuali qui sotto.',
-    created: 'Attività all\'avvio creata e avviata. Premi Avanti per continuare.',
-    alreadyDone: 'L\'attività all\'avvio c\'è già ed è aggiornata: qui non serve altro, premi Avanti.',
-    manualTitle: 'Configurazione manuale, solo se togli la spunta',
+    createFailed: 'DSM non ha creato l\'attività. Togliere la spunta e seguire i passi manuali qui sotto.',
+    created: 'Attività all\'avvio creata e avviata. Avanti per continuare.',
+    alreadyDone: 'L\'attività all\'avvio esiste già ed è aggiornata: non serve altro, Avanti per continuare.',
+    manualTitle: 'Configurazione manuale, solo senza la spunta',
     manualSteps: [
       'Pannello di controllo > Utilità di pianificazione > Crea > Attività attivata > Script definito dall\'utente. Utente: root. Evento: Avvio.',
       `Comando da eseguire: ${MANUAL_COMMAND}`,
-      'Salva, seleziona l\'attività, Esegui.',
+      'Salva, poi selezionare l\'attività ed Esegui.',
     ],
     uninstallTitle: 'Attività all\'avvio',
     uninstallDesc: 'L\'attività all\'avvio "zt-syno-net" viene rimossa insieme al pacchetto. '

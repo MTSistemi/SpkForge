@@ -20,8 +20,9 @@ ZeroTier One @ZEROTIER@ for Synology DSM 7, packaged by SpkForge. Italiano più 
 4. Open **ZeroTier** from the main menu to see the node ID and join or leave networks, then
    authorise the node in your network controller.
 
-Coming from the old `zerotier` package (e.g. from spk7.imnks.com)? **Uninstall it first.** Its
-identity and networks stay on disk and are moved over automatically, so the node ID does not change.
+Coming from the old `zerotier` package (e.g. from spk7.imnks.com) or from SynoCommunity's
+`zerotier-one`? **Uninstall it first.** Its identity and networks stay on disk and are moved over
+automatically, so the node ID does not change.
 
 Notes: leaving a network restarts ZeroTier, so other networks pause for a few seconds. After an
 upgrade, reload the DSM page if the ZeroTier window does not open.
@@ -43,29 +44,31 @@ ZeroTier One @ZEROTIER@ per Synology DSM 7, impacchettato da SpkForge.
 
 ## Quale file
 
-| Il tuo NAS | File |
+| NAS | File |
 |---|---|
 | CPU Intel o AMD (gran parte dei modelli "+", es. DS920+, DS1522+) | `zt-syno-net_x86_64_@VERSION@.spk` |
 | ARM a 64 bit (es. DS223, DS223j, DS220j, DS218) | `zt-syno-net_armv8_@VERSION@.spk` |
 | ARM a 32 bit (modelli "j" e value più vecchi) | `zt-syno-net_armv7_@VERSION@.spk` |
 | Intel Atom a 32 bit (modelli vecchi) | `zt-syno-net_i686_@VERSION@.spk` |
-| Non sei sicuro | `zt-syno-net_universal_@VERSION@.spk` (tutti e quattro, sceglie da solo) |
+| CPU non nota | `zt-syno-net_universal_@VERSION@.spk` (tutti e quattro, sceglie da solo) |
 
 ## Installazione
 
-1. Centro pacchetti > Installazione manuale > scegli il file > Avanti.
-2. Facoltativo: l'ID della rete a cui collegarsi.
-3. **Avvio automatico e guardia**: lascia la spunta e inserisci la tua password DSM. Il pacchetto
+1. Centro pacchetti > Installazione manuale > file `.spk` > Avanti.
+2. Facoltativo: l'ID della rete a cui collegare il NAS.
+3. **Avvio automatico e guardiano**: con la spunta lasciata, va inserita la password DSM
+   dell'amministratore. Il pacchetto
    crea un'attività all'avvio eseguita da root: DSM 7 non offre ai pacchetti di terze parti altri
    modi per avere il permesso di rete che serve a ZeroTier. Non servono altri pacchetti.
-4. Apri **ZeroTier** dal menu principale per vedere l'ID del nodo e collegarti o uscire dalle
-   reti, poi autorizza il nodo nel controller della rete.
+4. L'app **ZeroTier** nel menu principale mostra l'ID del nodo e collega o scollega le reti; il nodo
+   va poi autorizzato nel controller della rete.
 
-Arrivi dal vecchio pacchetto `zerotier` (per esempio da spk7.imnks.com)? **Disinstallalo prima.**
-Identità e reti restano sul disco e vengono trasferite da sole, così l'ID del nodo non cambia.
+Se è installato il vecchio pacchetto `zerotier` (per esempio da spk7.imnks.com) o `zerotier-one` di
+SynoCommunity, va **disinstallato prima**. Identità e reti restano sul disco e vengono trasferite in
+automatico, così l'ID del nodo non cambia.
 
-Note: uscire da una rete riavvia ZeroTier, quindi le altre reti si fermano per qualche secondo.
-Dopo un aggiornamento, se la finestra di ZeroTier non si apre, ricarica la pagina del DSM.
+Note: scollegare una rete riavvia ZeroTier, quindi le altre reti si fermano per qualche secondo.
+Dopo un aggiornamento, se la finestra di ZeroTier non si apre, va ricaricata la pagina del DSM.
 
 ## Verifica
 

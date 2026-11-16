@@ -23,21 +23,21 @@
       e_generic: 'Something went wrong ({0}).'
     },
     ita: {
-      subtitle: 'Collega questo NAS alle tue reti ZeroTier',
+      subtitle: 'Collegamento del NAS alle reti ZeroTier',
       nodeId: 'ID del nodo', version: 'Versione', networks: 'Reti',
-      joinTitle: 'Unisciti a una rete', networkId: 'ID della rete', join: 'Unisciti',
-      joinHint: 'Dopo esserti unito, autorizza questo nodo nel controller della rete.',
+      joinTitle: 'Collegamento a una rete', networkId: 'ID della rete', join: 'Collega',
+      joinHint: 'Dopo il collegamento il nodo va autorizzato nel controller della rete.',
       networksTitle: 'Reti collegate', loading: 'Caricamento…', none: 'Questo NAS non è ancora collegato a nessuna rete.',
-      leave: 'Lascia', confirmLeave: 'Lasciare la rete? ZeroTier si riavvia: le altre reti si fermano per qualche secondo.', yes: 'Sì, lascia', no: 'Annulla',
+      leave: 'Scollega', confirmLeave: 'Scollegare il NAS da questa rete? ZeroTier si riavvia: le altre reti si fermano per qualche secondo.', yes: 'Sì, scollega', no: 'Annulla',
       online: 'Online', offline: 'Offline', tunneled: 'Online (via relay)', down: 'Servizio fermo',
       ips: 'Indirizzi', noIp: 'ancora nessun indirizzo', type: 'Tipo', mac: 'MAC',
       st_OK: 'Collegata', st_ACCESS_DENIED: 'In attesa di autorizzazione', st_REQUESTING_CONFIGURATION: 'Connessione…',
       st_NOT_FOUND: 'Rete inesistente', st_PORT_ERROR: 'Errore di porta', st_CLIENT_TOO_OLD: 'Client troppo vecchio',
-      helpDenied: 'Autorizza il nodo {0} nel controller di questa rete.',
-      badId: 'Un ID di rete è composto da 16 caratteri esadecimali.', joined: 'Collegato a {0}.', left: 'Rete {0} lasciata. ZeroTier si sta riavviando, torna tra qualche secondo…',
-      e_401: 'La sessione DSM è scaduta: accedi di nuovo.', e_403: 'Solo gli amministratori possono gestire ZeroTier.',
-      e_503: 'ZeroTier non è in esecuzione. Controlla il pacchetto nel Centro pacchetti.', e_net: 'Il NAS non risponde.',
-      e_generic: 'Qualcosa non è andato ({0}).'
+      helpDenied: 'Il nodo {0} va autorizzato nel controller di questa rete.',
+      badId: 'Un ID di rete è composto da 16 caratteri esadecimali.', joined: 'Collegato a {0}.', left: 'Scollegato dalla rete {0}. ZeroTier si sta riavviando: la pagina si aggiorna tra qualche secondo…',
+      e_401: 'Sessione DSM scaduta: è necessario accedere di nuovo.', e_403: 'Solo gli amministratori possono gestire ZeroTier.',
+      e_503: 'ZeroTier non è in esecuzione: verificare il pacchetto nel Centro pacchetti.', e_net: 'Il NAS non risponde.',
+      e_generic: 'Operazione non riuscita ({0}).'
     }
   };
 

@@ -164,7 +164,7 @@ export function buildSpk(options: BuildOptions): BuildResult {
     displayname_ita: 'ZeroTier (zt-syno-net)',
     description: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root, needs no other package and restarts itself if it stops. The install wizard sets everything up.`,
     description_enu: `ZeroTier One ${upstreamVersion}: join this NAS to your ZeroTier networks. Runs without root, needs no other package and restarts itself if it stops. The install wizard sets everything up.`,
-    description_ita: `ZeroTier One ${upstreamVersion}: collega questo NAS alle tue reti ZeroTier. Gira senza root, non richiede altri pacchetti e riparte da solo se si ferma. La procedura di installazione configura tutto.`,
+    description_ita: `ZeroTier One ${upstreamVersion}: collega il NAS alle reti ZeroTier. Gira senza root, non richiede altri pacchetti e riparte da solo se si ferma. La procedura di installazione configura tutto.`,
     changelog: `ZeroTier One ${upstreamVersion}.`,
     changelog_ita: `ZeroTier One ${upstreamVersion}.`,
     maintainer: 'MTSistemi',

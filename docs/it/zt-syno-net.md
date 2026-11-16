@@ -6,9 +6,8 @@ zt-syno-net è ZeroTier One, compilato senza modifiche dai sorgenti upstream, im
 NAS Synology con DSM 7: Intel e AMD (x86_64), ARM a 64 bit (armv8), ARM a 32 bit (armv7) e Intel
 Atom a 32 bit (i686).
 
-Gira **senza root**, **non dipende da nessun altro pacchetto** e **si rimette in piedi da solo**:
-niente SimplePermissionManager, niente intermediari di privilegi, niente che possa smettere di
-funzionare a una data.
+Gira **senza root**, **non dipende da altri pacchetti** e **si riavvia da solo** se si ferma: non
+usa SimplePermissionManager né altri intermediari di privilegi, né firme con una scadenza.
 
 ## Quale file
 
@@ -22,13 +21,14 @@ funzionare a una data.
 
 ## Installazione
 
-1. Arrivi dal vecchio pacchetto `zerotier` (spk7.imnks.com)? **Disinstallalo prima.** Identità e
-   reti restano su disco e vengono spostate da sole, così il node ID non cambia.
+1. Se è installato il vecchio pacchetto `zerotier` (spk7.imnks.com) o il pacchetto `zerotier-one`
+   di SynoCommunity, va **disinstallato prima**. Identità e reti restano su disco e vengono spostate
+   in automatico, così il node ID non cambia.
 2. Centro pacchetti > Installazione manuale > il file `.spk`.
-3. La procedura chiede un ID di rete (facoltativo) e, al passo **Avvio automatico e guardia**, la
-   tua password di DSM. Serve a DSM per creare l'unica attività che gira come root, "zt-syno-net",
-   nell'Utilità di pianificazione. È tutto qui: l'attività viene creata e avviata subito.
-4. Autorizza il nodo nel tuo controller ZeroTier.
+3. La procedura chiede un ID di rete (facoltativo) e, al passo **Avvio automatico e guardiano**, la
+   password DSM dell'amministratore. Serve a DSM per creare l'unica attività eseguita da root,
+   "zt-syno-net", nell'Utilità di pianificazione. L'attività viene creata e avviata subito.
+4. Il nodo va autorizzato nel controller ZeroTier della rete.
 
 ## Perché un'attività di root, e cosa fa
 
@@ -78,10 +78,10 @@ sudo zerotier-cli listnetworks
 
 - `/var/packages/zt-syno-net/var/zt-syno-net.log`: avvio, supervisore, riavvii.
 - `/var/log/zt-syno-net-guard.log`: il guardiano di root.
-- Se nell'Utilità di pianificazione non c'è l'attività "zt-syno-net" (per esempio hai tolto la
-  spunta durante l'installazione), creala a mano: Attività attivata > Script definito dall'utente,
-  utente `root`, evento `Avvio`, poi Esegui. Usa il comando mostrato dalla procedura di
-  installazione: copia il launcher in `/run`, ne verifica lo SHA-256 rispetto a questa build e solo
+- Se nell'Utilità di pianificazione non c'è l'attività "zt-syno-net" (per esempio perché durante
+  l'installazione è stata tolta la spunta), va creata a mano: Attività attivata > Script definito
+  dall'utente, utente `root`, evento `Avvio`, poi Esegui. Il comando è quello mostrato dalla
+  procedura di installazione: copia il launcher in `/run`, ne verifica lo SHA-256 rispetto a questa build e solo
   allora lo esegue, così root non esegue mai un file che il pacchetto può modificare. Il comando
   cambia a ogni build: dopo un aggiornamento va aggiornata l'attività. La creazione automatica fa
   tutto questo da sola.

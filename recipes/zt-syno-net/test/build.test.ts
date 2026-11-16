@@ -332,7 +332,7 @@ test('wizards exist in English and Italian and validate the network ID', () => {
   }
   const it = JSON.parse(installWizard('ita'));
   assert.equal(it[0].items[0].subitems[0].key, 'wizard_network_id');
-  assert.equal(it[1].step_title, 'Avvio automatico e guardia');
+  assert.equal(it[1].step_title, 'Avvio automatico e guardiano');
   const regex = it[0].items[0].subitems[0].validator.regex.expr.slice(1, -1);
   assert.ok(new RegExp(regex).test('abcdef0123456789'));
   assert.ok(!new RegExp(regex).test('abcdef012345678'));

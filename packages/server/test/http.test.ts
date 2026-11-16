@@ -45,7 +45,7 @@ test('Package Center GET gets the newest fitting zt-syno-net, localised', async 
   assert.equal(packages.length, 1);
   assert.equal(packages[0]!.package, 'zt-syno-net');
   assert.equal(packages[0]!.version, '1.16.2-1');
-  assert.match(packages[0]!.desc, /collega questo NAS/);
+  assert.match(packages[0]!.desc, /collega il NAS/);
   // Both the x86_64 and the universal file fit; the per-family one is preferred (smaller).
   assert.match(packages[0]!.link, /^https:\/\/spk\.example\.test\/packages\/zt-syno-net\/1\.16\.2-1\/zt-syno-net_(x86_64|universal)_1\.16\.2-1\.spk\?arch=geminilake/);
 });
