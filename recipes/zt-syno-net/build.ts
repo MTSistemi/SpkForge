@@ -57,12 +57,13 @@ export interface BuildResult {
 function asset(path: string): string {
   return readFileSync(join(FILES, path), 'utf8');
 }
+const textAsset = asset;
 
 /**
  * An app file whose links carry the package version (@VERSION@), so browsers
  * fetch the new files after an upgrade instead of reusing cached ones.
  */
-function versioned(path: string, version: string): string {
+function versionedAsset(path: string, version: string): string {
   const text = asset(path);
   if (!text.includes('@VERSION@')) throw new Error(`${path} has no @VERSION@ placeholder`);
   return text.replaceAll('@VERSION@', version);
@@ -89,20 +90,32 @@ https://github.com/MTSistemi/SpkForge
 `;
 }
 
+/** Which package the DSM app belongs to: its name and the JavaScript namespace of its window. */
+export interface AppIdentity {
+  pkg: string;
+  ns: string;
+}
+export const SPKFORGE_APP: AppIdentity = { pkg: PACKAGE, ns: 'SpkForge.ZtSynoNet' };
+
 /**
  * The DSM app (window, page, CGI, texts, icons) under app/, for the given
- * package version. Shared with the spksrc recipe (contrib/spksrc/generate.ts).
+ * package version. Shared with the spksrc recipe (contrib/spksrc/generate.ts),
+ * which builds it for another package name: the sources are written for
+ * zt-syno-net and SpkForge.ZtSynoNet, and both are replaced.
  */
-export function appFiles(version: string): { name: string; data?: string | Uint8Array; mode?: number }[] {
+export function appFiles(version: string, app: AppIdentity = SPKFORGE_APP): { name: string; data?: string | Uint8Array; mode?: number }[] {
+  const named = (text: string) => text.replaceAll('SpkForge.ZtSynoNet', app.ns).replaceAll('zt-syno-net', app.pkg);
+  const versioned = (path: string) => named(versionedAsset(path, version));
+  const asset = (path: string) => named(textAsset(path));
   return [
-    { name: 'app/config', data: versioned('app/config', version) },
-    { name: 'app/ZtSynoNet.js', data: versioned('app/ZtSynoNet.js', version) },
+    { name: 'app/config', data: versioned('app/config') },
+    { name: 'app/ZtSynoNet.js', data: versioned('app/ZtSynoNet.js') },
     { name: 'app/texts' },
     { name: 'app/texts/enu' },
     { name: 'app/texts/enu/strings', data: asset('app/texts/enu/strings') },
     { name: 'app/texts/ita' },
     { name: 'app/texts/ita/strings', data: asset('app/texts/ita/strings') },
-    { name: 'app/index.html', data: versioned('app/index.html', version) },
+    { name: 'app/index.html', data: versioned('app/index.html') },
     { name: 'app/app.js', data: asset('app/app.js') },
     { name: 'app/app.css', data: asset('app/app.css') },
     { name: 'app/cgi' },

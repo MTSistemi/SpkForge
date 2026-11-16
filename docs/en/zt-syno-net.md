@@ -44,6 +44,9 @@ guard that:
   If the old ZeroTier is still running, starting the package fails with a message saying so;
 - every 30 seconds starts the package when DSM wants it running and it is not.
 
+When it starts, the guard moves itself to the root cgroup: started from the install wizard it would
+otherwise belong to DSM's web server, and stop when that restarts.
+
 The guard's text lives **inside the task**, which DSM keeps root-owned: root never runs a file the
 package can modify. Inside the package, an unprivileged supervisor restarts ZeroTier when it stops
 or stops answering (it checks both the node status and the network list).

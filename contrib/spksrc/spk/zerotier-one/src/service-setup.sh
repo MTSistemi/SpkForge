@@ -1,25 +1,25 @@
-# zt-syno-net (ZeroTier) service definition.
+# zerotier-one (ZeroTier) service definition.
 #
-# The daemon runs as the package user (sc-zt-syno-net), never as root, under a
+# The daemon runs as the package user (sc-zerotier-one), never as root, under a
 # supervisor that restarts it if it stops. It needs CAP_NET_ADMIN and
 # /dev/net/tun: DSM 7 refuses both to third-party packages, so the install
-# wizard creates a root boot-up task ("zt-syno-net") that runs a small guard;
+# wizard creates a root boot-up task ("zerotier-one") that runs a small guard;
 # the guard grants them, also after every upgrade. No other package is involved.
 
 ZEROTIER="${SYNOPKG_PKGDEST}/bin/zerotier-one"
 # The supervisor runs zerotier-one with -U (skip its own root check).
-SERVICE_COMMAND="/bin/sh ${SYNOPKG_PKGDEST}/bin/zt-syno-net-supervise"
+SERVICE_COMMAND="/bin/sh ${SYNOPKG_PKGDEST}/bin/zerotier-one-supervise"
 SVC_BACKGROUND=y
 SVC_WRITE_PID=y
 
 zt_caps_ready ()
 {
-    [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" = "$(cat /run/zt-syno-net.caps 2>/dev/null)" ]
+    [ "$(stat -c '%i:%Y:%s' "${ZEROTIER}" 2>/dev/null)" = "$(cat /run/zerotier-one.caps 2>/dev/null)" ]
 }
 
 zt_migration_pending ()
 {
-    [ -e /run/zt-syno-net.migrating ] && [ ! -e "${SYNOPKG_PKGVAR}/identity.secret" ]
+    [ -e /run/zerotier-one.migrating ] && [ ! -e "${SYNOPKG_PKGVAR}/identity.secret" ]
 }
 
 service_prestart ()
@@ -28,11 +28,11 @@ service_prestart ()
     # read: the node would come up under a new address, unknown to the network.
     if [ -e "${SYNOPKG_PKGVAR}/identity.secret" ] && [ ! -r "${SYNOPKG_PKGVAR}/identity.secret" ]; then
         echo "ERROR: ${SYNOPKG_PKGVAR}/identity.secret is not readable by $(id -un)."
-        echo "The zt-syno-net guard fixes it within 30 seconds."
+        echo "The zerotier-one guard fixes it within 30 seconds."
         exit 1
     fi
     if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
-        echo "ERROR: /dev/net/tun is not ready: is the zt-syno-net boot-up task present in Task Scheduler?"
+        echo "ERROR: /dev/net/tun is not ready: is the zerotier-one boot-up task present in Task Scheduler?"
         exit 1
     fi
     # /bin/getcap is root-only on DSM, so the root guard records in /run the
@@ -40,18 +40,18 @@ service_prestart ()
     # record no longer matches until the guard has run (within 30 seconds):
     # wait for it rather than fail the upgrade. The guard runs as root, so
     # its liveness is checked through /proc, not kill -0.
-    guard_pid=$(cat /run/zt-syno-net-guard.pid 2>/dev/null)
+    guard_pid=$(cat /run/zerotier-one-guard.pid 2>/dev/null)
     if ! zt_caps_ready && [ -n "${guard_pid}" ] && [ -d "/proc/${guard_pid}" ]; then
         echo "waiting for the guard to grant the network capability to ${ZEROTIER}"
         i=0
         while [ $i -lt 40 ] && ! zt_caps_ready; do sleep 1; i=$((i + 1)); done
     fi
     if ! zt_caps_ready; then
-        echo "ERROR: ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
+        echo "ERROR: ZeroTier has no network permission yet. Check that the zerotier-one boot-up task exists in Control Panel > Task Scheduler and run it."
         exit 1
     fi
     # While the guard still has to move over the identity of an older ZeroTier
-    # package it keeps /run/zt-syno-net.migrating. Starting now would make
+    # package it keeps /run/zerotier-one.migrating. Starting now would make
     # zerotier-one create a new identity, unknown to the node's networks.
     if zt_migration_pending; then
         echo "waiting for the guard to move over the identity of the previous ZeroTier package"

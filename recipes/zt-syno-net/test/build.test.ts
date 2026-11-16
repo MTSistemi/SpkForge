@@ -104,6 +104,17 @@ test('the root guard never follows symlinks or recurses into package-owned paths
   assert.ok(guard.indexOf('chmod 0700 "$d"') < guard.indexOf('setcap cap_net_admin'), 'only the package user may run the capable binary');
 });
 
+test('the guard leaves the cgroup of whoever started it before its loop', () => {
+  // Seen on DSM: a guard started from a service's process tree died when systemd
+  // stopped that service (setsid does not change the cgroup).
+  const guard = guardScript(SPKFORGE_GUARD);
+  const move = guard.indexOf('cgroup.procs');
+  assert.ok(move > 0, 'moves itself to the root cgroups');
+  assert.match(guard, /for r in \$\(awk '\$3 == "cgroup" \{ print \$2 \}' \/proc\/mounts\); do echo \$\$ > "\$r\/cgroup\.procs" 2>\/dev\/null; done/);
+  assert.ok(move > guard.indexOf('echo $$ > "$PIDF"') && move < guard.indexOf('while :; do'), 'after the handover, before the loop');
+  assert.ok(!taskOperation(SPKFORGE_GUARD).includes('%'));
+});
+
 test('the package never starts while an old identity waits to be migrated', () => {
   const guard = guardScript(SPKFORGE_GUARD);
   assert.match(guard, /^MIGRATING="\/run\/\$PKG\.migrating"$/m);

@@ -142,18 +142,19 @@ Lato amministrazione (dietro login):
   si installa su qualunque modello, anche su piattaforme che mancano dal nostro elenco.
 - Uno SPK per famiglia più quello universale, versione `<upstream>-<build>`, per esempio
   `1.16.2-1`.
-- Gira come utente del pacchetto con `CAP_NET_ADMIN`, concessa da un'attività all'avvio come
-  root che l'utente crea una volta nell'Utilità di pianificazione (`bin/zt-syno-net-setup`);
-  la stessa attività migra l'identità del vecchio pacchetto `zerotier`, così il node ID non
-  cambia.
+- Gira come utente del pacchetto con `CAP_NET_ADMIN`. La procedura di installazione crea, con la
+  password dell'amministratore, una sola attività all'avvio eseguita da root, che contiene il testo
+  di un piccolo guardiano: carica `tun`, concede la capability dopo ogni installazione o
+  aggiornamento, prende l'identità di un pacchetto ZeroTier precedente (così il node ID non cambia)
+  e avvia il pacchetto quando DSM lo vuole acceso.
 - Costruiti in GitHub Actions a ogni nuovo tag upstream, attestati, firmati, rilasciati.
 
-Punti tecnici aperti, da chiudere su un NAS vero prima della prima release:
+Risolti su NAS veri a novembre 2026 (dettagli in [zt-syno-net.md](zt-syno-net.md)):
 
-- come il pacchetto ottiene root e `/dev/net/tun` con le regole sui privilegi di DSM 7 senza un
-  intermediario di privilegi (il pacchetto di imnks usava SPM, vedi 2.1);
-- percorso di aggiornamento dal vecchio pacchetto `zerotier`: stesso nome di pacchetto, conservare
-  `/volume1/@appdata/zerotier` (identità e reti) così il node ID non cambia.
+- root e `/dev/net/tun` senza intermediari di privilegi: l'attività all'avvio descritta sopra. DSM
+  rifiuta script privilegiati e capability sui file dentro i pacchetti di terze parti;
+- passaggio dal vecchio pacchetto `zerotier`: nome di pacchetto diverso, e il guardiano copia
+  identità e reti da `/var/packages/zerotier/var` o da `/volume1/@appdata/zerotier`.
 
 ## 4. Regole del repository
 
@@ -168,13 +169,18 @@ SpkForge: la ricetta si contribuisce a SynoCommunity (`SynoCommunity/spksrc`, un
 e una `spk/`), che la costruisce e la distribuisce. Quel contributo segue la licenza di spksrc
 (BSD-3-Clause), come spksrc richiede.
 
+Lì il pacchetto si chiama `zerotier-one`, non `zt-syno-net`: con lo stesso nome il Centro pacchetti
+proporrebbe la build di SynoCommunity come aggiornamento di quella di SpkForge (e viceversa), con
+utenti del pacchetto diversi. Ciascuna build prende l'identità dell'altra, così un NAS può passare
+dall'una all'altra.
+
 ## 5. Decisioni prese
 
 - Nome: **SpkForge**. Licenza: **AGPL-3.0-or-later**, copyright MTSistemi. I contributi si
   accettano con un accordo di licenza (CLA), così MTSistemi può offrire anche altre licenze.
 - Repository: pubblico, solo `github.com/MTSistemi/SpkForge`.
+- Istanza pubblica: https://spkforge.mtsistemi.it (container di MTSistemi).
 
 ## 6. Decisioni aperte
 
-- Dove gira l'istanza pubblica, e su quale dominio.
 - Chiave di rilascio MTSistemi: crearla è un passo deliberato, da fare con Mattia.

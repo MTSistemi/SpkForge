@@ -1,4 +1,4 @@
-// zt-syno-net — DSM app: node status, joined networks, join and leave.
+// zerotier-one — DSM app: node status, joined networks, join and leave.
 // Runs inside a DSM window (iframe). Talks only to cgi/api.cgi, sending the
 // DSM session's SynoToken so DSM can verify the signed-in administrator.
 (function () {
@@ -46,7 +46,7 @@
   // Opened on its own (bookmark, old link): reopen inside DSM, where the page
   // gets the session's SynoToken.
   if (!dsm()) {
-    window.location.replace('/?launchApp=SpkForge.ZtSynoNet.Instance');
+    window.location.replace('/?launchApp=SynoCommunity.ZeroTierOne.Instance');
     return;
   }
   function lang() {

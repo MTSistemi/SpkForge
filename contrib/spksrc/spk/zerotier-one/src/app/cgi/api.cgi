@@ -1,5 +1,5 @@
 #!/bin/sh
-# zt-syno-net — management API for the DSM app.
+# zerotier-one — management API for the DSM app.
 #
 #   GET  api.cgi?action=status              node status and joined networks
 #   POST api.cgi?action=join&id=<16 hex>    join a network
@@ -10,7 +10,7 @@
 # foreign page cannot call this) and belong to the "administrators" group.
 # It talks to zerotier-one's local API on 127.0.0.1 with the daemon's token.
 
-HOME_DIR="/var/packages/zt-syno-net/var"
+HOME_DIR="/var/packages/zerotier-one/var"
 
 reply() {
     printf 'Status: %s\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n%s\n' "$1" "$2"

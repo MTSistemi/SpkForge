@@ -8,7 +8,7 @@
 // step's deactivate_v2 code when the admin presses Next. The password is wiped
 // from the form right after use, so it never reaches the package scripts.
 
-import { GUARD_VERSION, TASK_NAME, manualCommand, taskOperation, type GuardOptions } from './guard.ts';
+import { GUARD_VERSION, manualCommand, taskOperation, type GuardOptions } from './guard.ts';
 
 export type Lang = 'enu' | 'ita';
 
@@ -36,8 +36,18 @@ interface Texts {
 
 /** Placeholder in manualSteps, replaced by manualCommand() for the package being built. */
 const MANUAL_COMMAND = '@MANUAL_COMMAND@';
-/** Where both builds (SpkForge and spksrc) install the manual launcher. */
-export const LAUNCHER_PATH = '/var/packages/zt-syno-net/target/bin/zt-syno-net-guard';
+/** Where a build installs the manual launcher: bin/<package>-guard. */
+export function launcherPath(guard: GuardOptions): string {
+  return `/var/packages/${guard.pkg}/target/bin/${guard.pkg}-guard`;
+}
+export const LAUNCHER_PATH = launcherPath(SPKFORGE_GUARD);
+
+/** The texts with the package's own name: they are written for "zt-syno-net". */
+function textsFor(lang: Lang, guard: GuardOptions): Texts {
+  const named = (s: string) => s.replace(/zt-syno-net/g, guard.pkg);
+  const source = TEXTS[lang];
+  return Object.fromEntries(Object.entries(source).map(([k, v]) => [k, Array.isArray(v) ? v.map(named) : named(v)])) as unknown as Texts;
+}
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -105,9 +115,9 @@ const TEXTS: Record<Lang, Texts> = {
  * arguments are read from `arguments`.
  */
 export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
-  const t = TEXTS[lang];
+  const t = textsFor(lang, guard);
   const task = {
-    task_name: TASK_NAME,
+    task_name: guard.pkg,
     owner: { 0: 'root' },
     event: 'bootup',
     enable: true,
@@ -115,7 +125,7 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     notify_enable: false,
     notify_mail: '',
     notify_if_error: false,
-    description: `zt-syno-net guard v${GUARD_VERSION}`,
+    description: `${guard.pkg} guard v${GUARD_VERSION}`,
     operation_type: 'script',
     operation: taskOperation(guard),
   };
@@ -198,15 +208,15 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
  * change to the guard updates the task.
  */
 export function checkTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
-  const t = TEXTS[lang];
+  const t = textsFor(lang, guard);
   return `{
   var step = arguments[0], wizard = arguments[1];
   try {
     var owner = step.owner || wizard;
     var call = { api: 'SYNO.Core.EventScheduler', method: 'get', version: 1,
-      params: { task_name: ${JSON.stringify(TASK_NAME)} }, scope: step,
+      params: { task_name: ${JSON.stringify(guard.pkg)} }, scope: step,
       callback: function (ok, found) {
-        if (!ok || !found || found.task_name !== ${JSON.stringify(TASK_NAME)}) { return; }
+        if (!ok || !found || found.task_name !== ${JSON.stringify(guard.pkg)}) { return; }
         if (found.operation !== ${JSON.stringify(taskOperation(guard))}) { return; }
         step.ztDone = true;
         var form = step.getForm();
@@ -223,20 +233,20 @@ export function checkTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD
 }
 
 /** Body of the uninstall step's deactivate_v2 handler: removes the boot-up task. */
-export function deleteTaskScript(): string {
+export function deleteTaskScript(guard: GuardOptions = SPKFORGE_GUARD): string {
   return `{
   var step = arguments[0], wizard = arguments[1], action = arguments[2];
   if (action !== 'next' || step.ztDone) { return true; }
   step.ztDone = true;
   var call = { api: 'SYNO.Core.EventScheduler', method: 'delete', version: 1,
-    params: { task_name: ${JSON.stringify(TASK_NAME)} }, callback: function () {}, scope: step };
+    params: { task_name: ${JSON.stringify(guard.pkg)} }, callback: function () {}, scope: step };
   if (window.SYNO && SYNO.API && SYNO.API.Request) { SYNO.API.Request(call); } else { (step.owner || wizard).sendWebAPI(call); }
   return true;
 }`;
 }
 
 function guardStep(lang: Lang, guard: GuardOptions) {
-  const t = TEXTS[lang];
+  const t = textsFor(lang, guard);
   return {
     step_title: t.guardTitle,
     invalid_next_disabled_v2: false,
@@ -246,7 +256,7 @@ function guardStep(lang: Lang, guard: GuardOptions) {
       { type: 'password', subitems: [{ key: 'zt_admin_password', desc: t.passwordLabel, defaultValue: '', validator: { allowBlank: true } }] },
       {
         desc: `<b>${t.manualTitle}</b><br>${t.manualSteps.join('<br>')}`
-          .replace(MANUAL_COMMAND, `<code>${escapeHtml(manualCommand(guard, LAUNCHER_PATH))}</code>`),
+          .replace(MANUAL_COMMAND, `<code>${escapeHtml(manualCommand(guard, launcherPath(guard)))}</code>`),
       },
     ],
     activate_v2: checkTaskScript(lang, guard),
@@ -255,7 +265,7 @@ function guardStep(lang: Lang, guard: GuardOptions) {
 }
 
 export function installWizard(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
-  const t = TEXTS[lang];
+  const t = textsFor(lang, guard);
   return JSON.stringify([
     {
       step_title: t.networkTitle,
@@ -278,9 +288,9 @@ export function upgradeWizard(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD):
   return JSON.stringify([guardStep(lang, guard)], null, 2);
 }
 
-export function uninstallWizard(lang: Lang): string {
-  const t = TEXTS[lang];
-  return JSON.stringify([{ step_title: t.uninstallTitle, items: [{ desc: t.uninstallDesc }], deactivate_v2: deleteTaskScript() }], null, 2);
+export function uninstallWizard(lang: Lang, guard: GuardOptions = SPKFORGE_GUARD): string {
+  const t = textsFor(lang, guard);
+  return JSON.stringify([{ step_title: t.uninstallTitle, items: [{ desc: t.uninstallDesc }], deactivate_v2: deleteTaskScript(guard) }], null, 2);
 }
 
 /** Every wizard file of the package, keyed by its path inside the SPK. */
@@ -289,7 +299,7 @@ export function wizardFiles(guard: GuardOptions = SPKFORGE_GUARD): Record<string
   for (const [suffix, lang] of [['', 'enu'], ['_enu', 'enu'], ['_ita', 'ita']] as const) {
     files[`WIZARD_UIFILES/install_uifile${suffix}`] = installWizard(lang, guard);
     files[`WIZARD_UIFILES/upgrade_uifile${suffix}`] = upgradeWizard(lang, guard);
-    files[`WIZARD_UIFILES/uninstall_uifile${suffix}`] = uninstallWizard(lang);
+    files[`WIZARD_UIFILES/uninstall_uifile${suffix}`] = uninstallWizard(lang, guard);
   }
   return files;
 }

@@ -1,12 +1,12 @@
 #!/bin/sh
-# zt-syno-net — supervisor, runs as the package user (no root). It is the
+# zerotier-one — supervisor, runs as the package user (no root). It is the
 # spksrc SERVICE_COMMAND: keeps zerotier-one running, restarts it when it exits
 # (backoff 1 s .. 60 s, reset after 5 minutes of stable running) and when it
 # stops answering on its local API for three checks in a row.
 
-DAEMON="/var/packages/zt-syno-net/target/bin/zerotier-one"
-HOME_DIR="/var/packages/zt-syno-net/var"
-LOG_FILE="${HOME_DIR}/zt-syno-net-supervise.log"
+DAEMON="/var/packages/zerotier-one/target/bin/zerotier-one"
+HOME_DIR="/var/packages/zerotier-one/var"
+LOG_FILE="${HOME_DIR}/zerotier-one-supervise.log"
 CHECK_EVERY=4
 MAX_MISSES=3
 

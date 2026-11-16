@@ -1,6 +1,6 @@
 name: spksrc recipe
 
-# Builds the zt-syno-net recipe the way SynoCommunity will: inside the official
+# Builds the zerotier-one recipe the way SynoCommunity will: inside the official
 # spksrc tree and Docker image, with Synology's toolchains. Prints the digests
 # of the ZeroTier source so they can be committed to cross/zerotier/digests.
 
@@ -34,15 +34,15 @@ jobs:
       - name: Add the recipe to the spksrc tree
         run: |
           cp -r spkforge/contrib/spksrc/cross/zerotier spksrc/cross/
-          cp -r spkforge/contrib/spksrc/spk/zt-syno-net spksrc/spk/
-      - name: Build zt-syno-net for ${{ matrix.arch }}
+          cp -r spkforge/contrib/spksrc/spk/zerotier-one spksrc/spk/
+      - name: Build zerotier-one for ${{ matrix.arch }}
         run: |
           docker run --rm -v "$PWD/spksrc:/spksrc" -w /spksrc ghcr.io/synocommunity/spksrc:latest bash -c '
             set -e
             make setup >/dev/null
             if [ ! -s cross/zerotier/digests ]; then make -C cross/zerotier digests; fi
             echo "----- cross/zerotier/digests"; cat cross/zerotier/digests; echo "-----"
-            make -C spk/zt-syno-net arch-${{ matrix.arch }}
+            make -C spk/zerotier-one arch-${{ matrix.arch }}
           '
       - name: Show the package
         run: |
@@ -53,9 +53,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: spksrc-zt-syno-net-${{ matrix.arch }}
+          name: spksrc-zerotier-one-${{ matrix.arch }}
           path: |
             spksrc/packages/*.spk
             spksrc/cross/zerotier/digests
-            spksrc/spk/zt-syno-net/work-*/*.log
+            spksrc/spk/zerotier-one/work-*/*.log
           if-no-files-found: warn

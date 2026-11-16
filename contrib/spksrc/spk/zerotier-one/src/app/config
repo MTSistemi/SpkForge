@@ -1,20 +1,20 @@
 {
     "ZtSynoNet.js": {
-        "SpkForge.ZtSynoNet.Instance": {
+        "SynoCommunity.ZeroTierOne.Instance": {
             "type": "app",
-            "version": "1.16.2-3",
+            "version": "1.16.2-1",
             "title": "app:app_name",
             "desc": "app:description",
             "icon": "images/icon_{0}.png",
             "texts": "texts",
             "allowMultiInstance": false,
             "allUsers": false,
-            "appWindow": "SpkForge.ZtSynoNet.MainWindow",
-            "depend": ["SpkForge.ZtSynoNet.MainWindow"]
+            "appWindow": "SynoCommunity.ZeroTierOne.MainWindow",
+            "depend": ["SynoCommunity.ZeroTierOne.MainWindow"]
         },
-        "SpkForge.ZtSynoNet.MainWindow": {
+        "SynoCommunity.ZeroTierOne.MainWindow": {
             "type": "lib",
-            "version": "1.16.2-3",
+            "version": "1.16.2-1",
             "title": "app:app_name",
             "icon": "images/icon_{0}.png",
             "texts": "texts",

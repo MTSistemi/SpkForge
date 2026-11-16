@@ -46,6 +46,9 @@ L'attività "zt-syno-net" avvia un piccolo guardiano che:
   messaggio che lo spiega;
 - ogni 30 secondi avvia il pacchetto se DSM lo vuole acceso ed è fermo.
 
+All'avvio il guardiano si sposta nel cgroup radice: avviato dalla procedura di installazione
+apparterrebbe altrimenti al web server di DSM, e si fermerebbe quando questo si riavvia.
+
 Il testo del guardiano sta **dentro l'attività**, conservata da DSM come root: root non esegue mai
 file che il pacchetto può modificare. Dentro il pacchetto, un supervisore senza privilegi riavvia
 ZeroTier se si ferma o smette di rispondere (controlla sia lo stato del nodo sia l'elenco delle
