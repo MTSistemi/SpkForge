@@ -57,7 +57,7 @@ test('zerotier-one has its own name everywhere and takes over the other ZeroTier
   }
   const guard = readFileSync(join(SRC, 'zerotier-one-guard'), 'utf8');
   const old = guard.match(/^OLD_DIRS="([^"]*)"$/m)![1]!.split(' ');
-  assert.deepEqual(old, ['/var/packages/zerotier/var', '/volume1/@appdata/zerotier', '/var/packages/zt-syno-net/var', '/volume1/@appdata/zt-syno-net']);
+  assert.deepEqual(old, ['/var/packages/zt-syno-net/var', '/volume1/@appdata/zt-syno-net', '/var/packages/zerotier/var', '/volume1/@appdata/zerotier'], 'the other current build first, the old zerotier package last');
   const wizard = JSON.parse(readFileSync(join(SRC, 'wizard', 'install_uifile'), 'utf8'));
   assert.ok(wizard[1].deactivate_v2.includes('"task_name":"zerotier-one"'), 'the boot-up task is named after the package');
 });

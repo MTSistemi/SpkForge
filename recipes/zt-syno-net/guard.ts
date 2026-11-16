@@ -38,7 +38,7 @@ export interface GuardOptions {
   daemon: 'per-family' | string;
 }
 
-export const GUARD_VERSION = 4;
+export const GUARD_VERSION = 5;
 /** The boot-up task is named after the package; this is the SpkForge build's. */
 export const TASK_NAME = 'zt-syno-net';
 const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
@@ -50,8 +50,13 @@ const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
  * node ID. The package's own directory is left out. Both paths of each: the
  * /var/packages link while the package is installed, and its data directory,
  * which DSM keeps after an uninstall.
+ *
+ * The first directory with an identity wins, so the newest source comes first:
+ * the other build of this package, then the old "zerotier" one. Seen on a NAS
+ * that went zerotier -> zt-syno-net -> zerotier-one: with "zerotier" first, the
+ * networks came from its 2025 directory instead of from zt-syno-net's.
  */
-const KNOWN_PACKAGES = ['zerotier', 'zt-syno-net', 'zerotier-one'];
+const KNOWN_PACKAGES = ['zt-syno-net', 'zerotier-one', 'zerotier'];
 
 export function oldDirs(options: GuardOptions): string[] {
   return KNOWN_PACKAGES.filter((p) => p !== options.pkg)

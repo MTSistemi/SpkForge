@@ -59,12 +59,17 @@ make -C spk/zerotier-one arch-x64-7.2
 
 ## Tested
 
-- On 16/11/2026 the spksrc x64-7.2 build (then still named `zt-syno-net`, revision 3) was
-  installed on DSM 7.2.2-72806 (virtual DS723+) over an existing ZeroTier: the guard took over the
-  old identity on its own, the network came up with the same address, and the DSM app worked.
-- The install and upgrade wizards (same code) were tested through Package Center with the SpkForge
-  build on DSM 7.2.2-72806 x86_64 and DSM build 90075 ARMv8.
-- Not yet installed: the build under the final name `zerotier-one`.
+On 16/11/2026, with the spksrc x64-7.2 build `zerotier-one_x64-7.2_1.16.2-1.spk` on DSM 7.2.2-72806
+(virtual DS723+), next to the SpkForge build `zt-syno-net` (stopped):
+
+- new installation: package user `sc-zerotier-one`, DSM app registered, boot-up task created and
+  run; the guard took over the node identity by itself, the network came up with the same address
+  and MAC, and the guard left the cgroup of the process that started it;
+- upgrade (the same SPK installed again): the service came back by itself, same identity;
+- uninstall: package and boot-up task removed, the SpkForge build started again with its identity.
+
+The install and upgrade wizards (same code) were tested through Package Center with the SpkForge
+build on DSM 7.2.2-72806 x86_64 and DSM 7.4-90075 ARMv8 (DS223), with the admin password.
 
 ## Submitting
 
@@ -85,4 +90,4 @@ Not submitted yet: opening the pull request is MTSistemi's decision. Draft:
   > package (`zerotier`, or the SpkForge build `zt-syno-net`), so node IDs survive the switch.
   >
   > Checklist: DSM 7.1 builds for x64/aarch64/armv7/evansport and the DSM 7.2 x64 build pass;
-  > new installation tested on DSM 7.2.2.
+  > new installation, upgrade and uninstall tested on DSM 7.2.2 (x64).

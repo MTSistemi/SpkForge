@@ -62,13 +62,21 @@ make -C spk/zerotier-one arch-x64-7.2
 
 ## Prove fatte
 
-- Il 16/11/2026 la build spksrc x64-7.2 (allora ancora `zt-syno-net`, revisione 3) è stata
-  installata su DSM 7.2.2-72806 (DS723+ virtuale) al posto di uno ZeroTier esistente: il guardiano
-  ha preso da solo la vecchia identità, la rete è tornata con lo stesso indirizzo e l'app DSM
-  funzionava.
-- Le procedure di installazione e aggiornamento (stesso codice) sono state provate dal Centro
-  pacchetti con la build SpkForge su DSM 7.2.2-72806 x86_64 e DSM build 90075 ARMv8.
-- Non ancora installata: la build con il nome definitivo `zerotier-one`.
+Il 16/11/2026, con la build spksrc x64-7.2 `zerotier-one_x64-7.2_1.16.2-1.spk` su DSM 7.2.2-72806
+(DS723+ virtuale), accanto alla build SpkForge `zt-syno-net` (ferma):
+
+- nuova installazione: utente del pacchetto `sc-zerotier-one`, app DSM registrata, attività
+  all'avvio creata ed eseguita; il guardiano ha preso da solo l'identità del nodo, la rete è
+  tornata con lo stesso indirizzo e MAC, e il guardiano è uscito dal cgroup del processo che l'aveva
+  avviato;
+- aggiornamento (lo stesso SPK installato di nuovo): il servizio è ripartito da solo, stessa
+  identità;
+- disinstallazione: pacchetto e attività rimossi, la build SpkForge è ripartita con la sua
+  identità.
+
+Le procedure di installazione e aggiornamento (stesso codice) sono state provate dal Centro
+pacchetti con la build SpkForge su DSM 7.2.2-72806 x86_64 e DSM 7.4-90075 ARMv8 (DS223), con la
+password dell'amministratore.
 
 ## Invio
 
