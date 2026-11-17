@@ -22,7 +22,10 @@ ZeroTier One @ZEROTIER@ for Synology DSM 7, packaged by SpkForge. Italiano più 
 
 Coming from the old `zerotier` package (e.g. from spk7.imnks.com) or from SynoCommunity's
 `zerotier-one`? **Uninstall it first.** Its identity and networks stay on disk and are moved over
-automatically, so the node ID does not change.
+automatically, so the node ID does not change. Running ZeroTier's Docker image
+(`zerotier/zerotier-synology`) instead? **Stop the container first**: its identity is taken over from
+`/volume1/docker/zerotier-one`, `/volume1/docker/zerotier` or `/var/lib/zerotier-one`; remove the
+container once ZeroTier is back.
 
 Notes: leaving a network restarts ZeroTier, so other networks pause for a few seconds. After an
 upgrade, reload the DSM page if the ZeroTier window does not open.
@@ -65,7 +68,10 @@ ZeroTier One @ZEROTIER@ per Synology DSM 7, impacchettato da SpkForge.
 
 Se è installato il vecchio pacchetto `zerotier` (per esempio da spk7.imnks.com) o `zerotier-one` di
 SynoCommunity, va **disinstallato prima**. Identità e reti restano sul disco e vengono trasferite in
-automatico, così l'ID del nodo non cambia.
+automatico, così l'ID del nodo non cambia. Se ZeroTier gira invece nel container Docker
+(`zerotier/zerotier-synology`), va **fermato prima il container**: l'identità viene presa da
+`/volume1/docker/zerotier-one`, `/volume1/docker/zerotier` o `/var/lib/zerotier-one`; il container si
+rimuove quando ZeroTier è tornato su.
 
 Note: scollegare una rete riavvia ZeroTier, quindi le altre reti si fermano per qualche secondo.
 Dopo un aggiornamento, se la finestra di ZeroTier non si apre, va ricaricata la pagina del DSM.

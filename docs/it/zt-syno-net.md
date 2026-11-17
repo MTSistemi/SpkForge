@@ -23,7 +23,10 @@ usa SimplePermissionManager né altri intermediari di privilegi, né firme con u
 
 1. Se è installato il vecchio pacchetto `zerotier` (spk7.imnks.com) o il pacchetto `zerotier-one`
    di SynoCommunity, va **disinstallato prima**. Identità e reti restano su disco e vengono spostate
-   in automatico, così il node ID non cambia.
+   in automatico, così il node ID non cambia. Se ZeroTier gira nel container Docker
+   (`zerotier/zerotier-synology`), va **fermato prima il container**: l'identità viene presa da
+   `/volume1/docker/zerotier-one`, `/volume1/docker/zerotier` o `/var/lib/zerotier-one`. Il container
+   si rimuove dopo.
 2. Centro pacchetti > Installazione manuale > il file `.spk`.
 3. La procedura chiede un ID di rete (facoltativo) e, al passo **Avvio automatico e guardiano**, la
    password DSM dell'amministratore. Serve a DSM per creare l'unica attività eseguita da root,

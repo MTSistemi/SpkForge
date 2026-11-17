@@ -38,7 +38,7 @@ export interface GuardOptions {
   daemon: 'per-family' | string;
 }
 
-export const GUARD_VERSION = 5;
+export const GUARD_VERSION = 6;
 /** The boot-up task is named after the package; this is the SpkForge build's. */
 export const TASK_NAME = 'zt-syno-net';
 const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
@@ -58,9 +58,20 @@ const HEREDOC = 'ZT_SYNO_NET_GUARD_EOF';
  */
 const KNOWN_PACKAGES = ['zt-syno-net', 'zerotier-one', 'zerotier'];
 
+/**
+ * Host folders mounted as /var/lib/zerotier-one by ZeroTier's official Docker
+ * image for Synology (zerotier/zerotier-synology): its guide mounts the host's
+ * /var/lib/zerotier-one, and Container Manager setups usually keep it in the
+ * "docker" shared folder. Checked after the packages. While the container runs,
+ * its zerotier-one is "another zerotier-one" and the migration waits for it to
+ * stop, as with a package.
+ */
+const DOCKER_DIRS = ['/volume1/docker/zerotier-one', '/volume1/docker/zerotier', '/var/lib/zerotier-one'];
+
 export function oldDirs(options: GuardOptions): string[] {
   return KNOWN_PACKAGES.filter((p) => p !== options.pkg)
-    .flatMap((p) => [`/var/packages/${p}/var`, `/volume1/@appdata/${p}`]);
+    .flatMap((p) => [`/var/packages/${p}/var`, `/volume1/@appdata/${p}`])
+    .concat(DOCKER_DIRS);
 }
 
 function daemonResolver(options: GuardOptions): string {

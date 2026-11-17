@@ -174,7 +174,8 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
       request('SYNO.Core.EventScheduler', 'get', 1, { task_name: task.task_name }, function (okGet, found) {
         var exists = !!(okGet && found && found.task_name === task.task_name);
         if (exists) { task.old_task_name = task.task_name; }
-        request('SYNO.Core.EventScheduler.Root', exists ? 'set' : 'create', 1, task, function (ok2, res2) {
+        var method = exists ? 'set' : 'create';
+        var created = function (ok2, res2) {
           if (!ok2) { fail(${JSON.stringify(t.createFailed)}, res2); return; }
           request('SYNO.Core.EventScheduler', 'list', 1, {}, function (okList, tasks) {
             var present = false;
@@ -188,6 +189,20 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
               show(${JSON.stringify(t.created)});
             });
           });
+        };
+        // DSM 7.2 and later create root tasks through EventScheduler.Root, with the
+        // password token. DSM 7.0 and 7.1 have no such API (102: no such API,
+        // 103/104: method or version not there) and let an administrator create a
+        // root task through EventScheduler itself, as their Task Scheduler does.
+        request('SYNO.Core.EventScheduler.Root', method, 1, task, function (ok2, res2) {
+          var code = res2 && res2.code;
+          if (!ok2 && (code === 102 || code === 103 || code === 104)) {
+            var legacy = {};
+            for (var k in task) { if (k !== 'SynoConfirmPWToken') { legacy[k] = task[k]; } }
+            request('SYNO.Core.EventScheduler', method, 1, legacy, created);
+            return;
+          }
+          created(ok2, res2);
         });
       });
     });

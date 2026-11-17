@@ -23,7 +23,9 @@ SimplePermissionManager, no privilege broker, nothing that can stop working on a
 
 1. Coming from the old `zerotier` package (spk7.imnks.com) or from SynoCommunity's `zerotier-one`?
    **Uninstall it first.** Its identity and networks stay on disk and are moved over automatically,
-   so the node ID does not change.
+   so the node ID does not change. Running ZeroTier's Docker image (`zerotier/zerotier-synology`)?
+   **Stop the container first**: the identity is taken over from `/volume1/docker/zerotier-one`,
+   `/volume1/docker/zerotier` or `/var/lib/zerotier-one`. Remove the container afterwards.
 2. Package Center > Manual Install > the `.spk`.
 3. The wizard asks for a network ID (optional) and, on the **Automatic start and guard** step,
    for your DSM password. DSM needs it to create the one task that runs as root, "zt-syno-net",

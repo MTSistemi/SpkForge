@@ -259,6 +259,53 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
   }
 });
 
+test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7.1 (no .Root API)', () => {
+  // Runs the install step's handler against a fake DSM. DSM 7.1 answers 102 (no such API)
+  // for SYNO.Core.EventScheduler.Root and creates root tasks through EventScheduler itself.
+  const run = (hasRoot: boolean) => {
+    const body = JSON.parse(installWizard('enu'))[1].deactivate_v2 as string;
+    const fn = new Function(`let fn; ${'fn = function(){0};'.replace('{0}', body)} return fn;`)() as (...a: unknown[]) => unknown;
+    const calls: { api: string; method: string; params: Record<string, unknown> }[] = [];
+    let created = false;
+    const fields: Record<string, { v: unknown; getValue(): unknown; setValue(x: unknown): void }> = {};
+    for (const [k, v] of [['zt_create_task', true], ['zt_admin_password', 'secret']] as const) {
+      fields[k] = { v, getValue() { return this.v; }, setValue(x) { this.v = x; } };
+    }
+    const messages: string[] = [];
+    const owner = {
+      getMsgBox: () => ({ alert: (_t: string, m: string) => messages.push(m) }),
+      sendWebAPI(c: { api: string; method: string; params: Record<string, unknown>; callback: (ok: boolean, r: unknown) => void }) {
+        calls.push({ api: c.api, method: c.method, params: c.params });
+        const reply = (ok: boolean, r: unknown) => c.callback(ok, r);
+        if (c.api === 'SYNO.Core.User.PasswordConfirm') return reply(true, { SynoConfirmPWToken: 'tok' });
+        if (c.api === 'SYNO.Core.EventScheduler.Root') {
+          if (!hasRoot) return reply(false, { code: 102 });
+          created = true; return reply(true, {});
+        }
+        if (c.method === 'get') return reply(true, {});
+        if (c.method === 'create') { created = true; return reply(true, {}); }
+        if (c.method === 'list') return reply(true, created ? [{ task_name: 'zt-syno-net' }] : []);
+        return reply(true, {});
+      },
+    };
+    const step = { owner, getForm: () => ({ findField: (k: string) => fields[k] }) } as Record<string, unknown>;
+    fn(step, {}, 'next');
+    return { calls, step, messages };
+  };
+  const legacy = run(false);
+  const create = legacy.calls.find((c) => c.api === 'SYNO.Core.EventScheduler' && c.method === 'create');
+  assert.ok(create, 'falls back to EventScheduler.create');
+  assert.deepEqual(create.params.owner, { 0: 'root' });
+  assert.equal(create.params.SynoConfirmPWToken, undefined, 'no password token to the old API');
+  assert.equal(typeof create.params.operation, 'string');
+  assert.equal(legacy.step.ztDone, true, 'task verified with list and run');
+  assert.ok(legacy.calls.some((c) => c.method === 'run'));
+  const current = run(true);
+  assert.ok(!current.calls.some((c) => c.api === 'SYNO.Core.EventScheduler' && c.method === 'create'), 'DSM 7.2 uses .Root only');
+  assert.equal(current.calls.find((c) => c.api === 'SYNO.Core.EventScheduler.Root')!.params.SynoConfirmPWToken, 'tok');
+  assert.equal(current.step.ztDone, true);
+});
+
 test('firewall rule lives inside the payload, where conf/resource points', () => {
   const entries = readTar(build().bytes);
   const resource = JSON.parse(new TextDecoder().decode(entries.find((e) => e.name === 'conf/resource')!.data));
