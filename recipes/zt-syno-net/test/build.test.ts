@@ -265,7 +265,7 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
   const run = (hasRoot: boolean) => {
     const body = JSON.parse(installWizard('enu'))[1].deactivate_v2 as string;
     const fn = new Function(`let fn; ${'fn = function(){0};'.replace('{0}', body)} return fn;`)() as (...a: unknown[]) => unknown;
-    const calls: { api: string; method: string; params: Record<string, unknown> }[] = [];
+    const calls: { api: string; method: string; version: number; params: Record<string, unknown> }[] = [];
     let created = false;
     const fields: Record<string, { v: unknown; getValue(): unknown; setValue(x: unknown): void }> = {};
     for (const [k, v] of [['zt_create_task', true], ['zt_admin_password', 'secret']] as const) {
@@ -274,10 +274,14 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
     const messages: string[] = [];
     const owner = {
       getMsgBox: () => ({ alert: (_t: string, m: string) => messages.push(m) }),
-      sendWebAPI(c: { api: string; method: string; params: Record<string, unknown>; callback: (ok: boolean, r: unknown) => void }) {
-        calls.push({ api: c.api, method: c.method, params: c.params });
+      sendWebAPI(c: { api: string; method: string; version: number; params: Record<string, unknown>; callback: (ok: boolean, r: unknown) => void }) {
+        calls.push({ api: c.api, method: c.method, version: c.version, params: c.params });
         const reply = (ok: boolean, r: unknown) => c.callback(ok, r);
-        if (c.api === 'SYNO.Core.User.PasswordConfirm') return reply(true, { SynoConfirmPWToken: 'tok' });
+        // DSM 7.1: PasswordConfirm has version 1 only, and its answer carries no token.
+        if (c.api === 'SYNO.Core.User.PasswordConfirm') {
+          if (!hasRoot) return c.version === 1 ? reply(true, {}) : reply(false, { code: 104 });
+          return reply(true, { SynoConfirmPWToken: 'tok' });
+        }
         if (c.api === 'SYNO.Core.EventScheduler.Root') {
           if (!hasRoot) return reply(false, { code: 102 });
           created = true; return reply(true, {});
@@ -294,6 +298,7 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
   };
   const legacy = run(false);
   const create = legacy.calls.find((c) => c.api === 'SYNO.Core.EventScheduler' && c.method === 'create');
+  assert.deepEqual(legacy.calls.filter((c) => c.api === 'SYNO.Core.User.PasswordConfirm').map((c) => c.version), [2, 1], 'password checked with version 1 after 104');
   assert.ok(create, 'falls back to EventScheduler.create');
   assert.deepEqual(create.params.owner, { 0: 'root' });
   assert.equal(create.params.SynoConfirmPWToken, undefined, 'no password token to the old API');

@@ -164,10 +164,14 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     };
     var task = ${JSON.stringify(task)};
     try { if (owner.setStatusBusy) { owner.setStatusBusy(); } } catch (ignore) {}
-    request('SYNO.Core.User.PasswordConfirm', 'auth', 2, { password: pw }, function (ok, res) {
+    // DSM 7.2+ answers version 2 with the token EventScheduler.Root wants. DSM 7.0/7.1
+    // only have version 1 (104 on version 2) and no .Root API: there the check proves
+    // the password and the task is created without a token (see below).
+    var confirm = function (version, cb) { request('SYNO.Core.User.PasswordConfirm', 'auth', version, { password: pw }, cb); };
+    var after = function (ok, res) {
       pw = '';
-      if (!ok || !res || !res.SynoConfirmPWToken) { fail(${JSON.stringify(t.badPassword)}, res); return; }
-      task.SynoConfirmPWToken = res.SynoConfirmPWToken;
+      if (!ok || !res) { fail(${JSON.stringify(t.badPassword)}, res); return; }
+      if (res.SynoConfirmPWToken) { task.SynoConfirmPWToken = res.SynoConfirmPWToken; }
       // DSM answers get/set/run on a task that does not exist with success and no
       // data, so "exists" means "get returned the task", and the result is checked
       // with list at the end instead of trusting the success flags.
@@ -205,6 +209,10 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
           created(ok2, res2);
         });
       });
+    };
+    confirm(2, function (ok2pw, res2pw) {
+      if (!ok2pw && res2pw && res2pw.code === 104) { confirm(1, after); return; }
+      after(ok2pw, res2pw);
     });
     return false;
   } catch (e) {
