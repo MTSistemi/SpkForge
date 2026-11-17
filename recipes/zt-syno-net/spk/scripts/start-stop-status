@@ -35,6 +35,10 @@ fail() {
     return 1
 }
 
+tun_ready() {
+    [ -c /dev/net/tun ] && [ -w /dev/net/tun ]
+}
+
 caps_ready() {
     [ "$(stat -c '%i:%Y:%s' "${DAEMON}" 2>/dev/null)" = "$(cat "${CAPS_MARK}" 2>/dev/null)" ]
 }
@@ -62,16 +66,23 @@ prerequisites_ok() {
         fail "${HOME_DIR}/identity.secret is not readable by $(id -un). The zt-syno-net guard fixes it within 30 seconds: start the package again then."
         return 1
     fi
-    if [ ! -c /dev/net/tun ] || [ ! -w /dev/net/tun ]; then
+    # After an install or upgrade the guard loads tun and grants the capability
+    # on its next round (every 5 seconds), while Package Center starts the
+    # package at once: wait for the guard rather than fail. On a first install
+    # the wizard has just run the boot-up task, so the guard may not be up yet
+    # either: give it 15 seconds to appear.
+    if ! tun_ready || ! caps_ready; then
+        log "waiting for the guard to prepare /dev/net/tun and the network capability of ${DAEMON}"
+        i=0
+        while [ $i -lt 60 ]; do
+            tun_ready && caps_ready && break
+            [ $i -ge 15 ] && ! guard_running && break
+            sleep 1; i=$((i + 1))
+        done
+    fi
+    if ! tun_ready; then
         fail "/dev/net/tun is not ready. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."
         return 1
-    fi
-    # After an install or upgrade the guard grants the capability on its next
-    # round: wait for it rather than fail the upgrade.
-    if ! caps_ready && guard_running; then
-        log "waiting for the guard to grant the network capability to ${DAEMON}"
-        i=0
-        while [ $i -lt 40 ] && ! caps_ready; do sleep 1; i=$((i + 1)); done
     fi
     if ! caps_ready; then
         fail "ZeroTier has no network permission yet. Check that the zt-syno-net boot-up task exists in Control Panel > Task Scheduler and run it."

@@ -130,6 +130,20 @@ test('the package never starts while an old identity waits to be migrated', () =
   assert.ok(sss.indexOf('migration_pending; then') > sss.indexOf('caps_ready; then'), 'start checks the migration after the capability');
 });
 
+test('start waits for the guard to load tun before failing (first install races the guard)', () => {
+  // Package Center starts the package right after installing it; the guard loads tun on its
+  // next round, up to 5 seconds later. Seen on DSM 7.3: "/dev/net/tun is not ready" at install.
+  const sss = readFileSync(new URL('../spk/scripts/start-stop-status', import.meta.url), 'utf8');
+  const wait = sss.indexOf('tun_ready && caps_ready && break');
+  assert.ok(wait > 0, 'start waits for both tun and the capability');
+  assert.ok(sss.indexOf('/dev/net/tun is not ready') > wait, 'the tun error comes only after the wait');
+  assert.match(sss, /\[ \$i -ge 15 \] && ! guard_running && break/);
+  const svc = readFileSync(new URL('../../../contrib/spksrc/spk/zerotier-one/src/service-setup.sh', import.meta.url), 'utf8');
+  const svcWait = svc.indexOf('zt_tun_ready && zt_caps_ready && break');
+  assert.ok(svcWait > 0, 'the spksrc service setup waits as well');
+  assert.ok(svc.indexOf('/dev/net/tun is not ready') > svcWait);
+});
+
 test('guard behaviour: migrates past a task shell, waits for a real zerotier-one', { skip: process.platform !== 'linux' && 'needs Linux /proc' }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'zt-guard-'));
   const user = spawnSync('id', ['-un']).stdout.toString().trim();
