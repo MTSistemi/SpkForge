@@ -280,12 +280,13 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
         // As measured on DSM 7.1.1: PasswordConfirm has version 1 only; a good password
         // gets success with no data at all, a wrong one error 3121.
         if (c.api === 'SYNO.Core.User.PasswordConfirm') {
-          if (!goodPassword) return reply(false, { code: hasRoot ? 400 : 3121 });
-          if (!hasRoot) return c.version === 1 ? reply(true, undefined) : reply(false, { code: 104 });
+          // SYNO.API.Request on DSM 7.1 nests the error: { error: { code } }.
+          if (!goodPassword) return reply(false, hasRoot ? { code: 400 } : { error: { code: 3121 } });
+          if (!hasRoot) return c.version === 1 ? reply(true, undefined) : reply(false, { error: { code: 104 } });
           return reply(true, { SynoConfirmPWToken: 'tok' });
         }
         if (c.api === 'SYNO.Core.EventScheduler.Root') {
-          if (!hasRoot) return reply(false, { code: 102 });
+          if (!hasRoot) return reply(false, { error: { code: 102 } });
           created = true; return reply(true, {});
         }
         if (c.method === 'get') return reply(true, {});
@@ -302,6 +303,7 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
   const create = legacy.calls.find((c) => c.api === 'SYNO.Core.EventScheduler' && c.method === 'create');
   assert.deepEqual(legacy.calls.filter((c) => c.api === 'SYNO.Core.User.PasswordConfirm').map((c) => c.version), [2, 1], 'password checked with version 1 after 104');
   assert.ok(create, 'falls back to EventScheduler.create');
+  assert.ok(!legacy.calls.some((c) => c.api === 'SYNO.Core.EventScheduler.Root'), 'no token: DSM 7.0/7.1, .Root not even tried');
   assert.deepEqual(create.params.owner, { 0: 'root' });
   assert.equal(create.params.SynoConfirmPWToken, undefined, 'no password token to the old API');
   assert.equal(typeof create.params.operation, 'string');

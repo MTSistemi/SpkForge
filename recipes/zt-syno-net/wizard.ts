@@ -157,9 +157,18 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
       else if (window.SYNO && SYNO.API && SYNO.API.Request) { SYNO.API.Request(call); }
       else { throw new Error('no DSM WebAPI client in this window'); }
     };
+    // DSM's WebAPI clients hand errors over either as { code } or as { error: { code } }
+    // (SYNO.API.Request on DSM 7.1 does the latter): read both.
+    var errOf = function (response) {
+      if (!response) { return null; }
+      if (response.code) { return response; }
+      return response.error && response.error.code ? response.error : null;
+    };
+    var codeOf = function (response) { var e = errOf(response); return e ? e.code : 0; };
     var fail = function (text, response) {
       idle();
-      var code = response && response.code ? ' [' + response.code + (response.errors ? ' ' + JSON.stringify(response.errors) : '') + ']' : '';
+      var e = errOf(response);
+      var code = e ? ' [' + e.code + (e.errors ? ' ' + JSON.stringify(e.errors) : '') + ']' : '';
       show(text + code);
     };
     var task = ${JSON.stringify(task)};
@@ -197,23 +206,26 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
           });
         };
         // DSM 7.2 and later create root tasks through EventScheduler.Root, with the
-        // password token. DSM 7.0 and 7.1 have no such API (102: no such API,
-        // 103/104: method or version not there) and let an administrator create a
-        // root task through EventScheduler itself, as their Task Scheduler does.
+        // password token. DSM 7.0 and 7.1 have no such API and let an administrator
+        // create a root task through EventScheduler itself, as their Task Scheduler
+        // does. No token means the old password check answered: go there directly.
+        // With a token, a missing .Root (102: no such API, 103/104: method or version
+        // not there) still falls back.
+        var legacyCreate = function () {
+          var legacy = {};
+          for (var k in task) { if (k !== 'SynoConfirmPWToken') { legacy[k] = task[k]; } }
+          request('SYNO.Core.EventScheduler', method, 1, legacy, created);
+        };
+        if (!task.SynoConfirmPWToken) { legacyCreate(); return; }
         request('SYNO.Core.EventScheduler.Root', method, 1, task, function (ok2, res2) {
-          var code = res2 && res2.code;
-          if (!ok2 && (code === 102 || code === 103 || code === 104)) {
-            var legacy = {};
-            for (var k in task) { if (k !== 'SynoConfirmPWToken') { legacy[k] = task[k]; } }
-            request('SYNO.Core.EventScheduler', method, 1, legacy, created);
-            return;
-          }
+          var code = codeOf(res2);
+          if (!ok2 && (code === 102 || code === 103 || code === 104)) { legacyCreate(); return; }
           created(ok2, res2);
         });
       });
     };
     confirm(2, function (ok2pw, res2pw) {
-      if (!ok2pw && res2pw && res2pw.code === 104) { confirm(1, after); return; }
+      if (!ok2pw && codeOf(res2pw) === 104) { confirm(1, after); return; }
       after(ok2pw, res2pw);
     });
     return false;
