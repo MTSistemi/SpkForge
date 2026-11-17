@@ -262,7 +262,7 @@ test('wizard JavaScript is valid and wipes the password before any request', () 
 test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7.1 (no .Root API)', () => {
   // Runs the install step's handler against a fake DSM. DSM 7.1 answers 102 (no such API)
   // for SYNO.Core.EventScheduler.Root and creates root tasks through EventScheduler itself.
-  const run = (hasRoot: boolean) => {
+  const run = (hasRoot: boolean, goodPassword = true) => {
     const body = JSON.parse(installWizard('enu'))[1].deactivate_v2 as string;
     const fn = new Function(`let fn; ${'fn = function(){0};'.replace('{0}', body)} return fn;`)() as (...a: unknown[]) => unknown;
     const calls: { api: string; method: string; version: number; params: Record<string, unknown> }[] = [];
@@ -277,9 +277,11 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
       sendWebAPI(c: { api: string; method: string; version: number; params: Record<string, unknown>; callback: (ok: boolean, r: unknown) => void }) {
         calls.push({ api: c.api, method: c.method, version: c.version, params: c.params });
         const reply = (ok: boolean, r: unknown) => c.callback(ok, r);
-        // DSM 7.1: PasswordConfirm has version 1 only, and its answer carries no token.
+        // As measured on DSM 7.1.1: PasswordConfirm has version 1 only; a good password
+        // gets success with no data at all, a wrong one error 3121.
         if (c.api === 'SYNO.Core.User.PasswordConfirm') {
-          if (!hasRoot) return c.version === 1 ? reply(true, {}) : reply(false, { code: 104 });
+          if (!goodPassword) return reply(false, { code: hasRoot ? 400 : 3121 });
+          if (!hasRoot) return c.version === 1 ? reply(true, undefined) : reply(false, { code: 104 });
           return reply(true, { SynoConfirmPWToken: 'tok' });
         }
         if (c.api === 'SYNO.Core.EventScheduler.Root') {
@@ -309,6 +311,12 @@ test('wizard creates the task on DSM 7.2+ (EventScheduler.Root) and on DSM 7.0/7
   assert.ok(!current.calls.some((c) => c.api === 'SYNO.Core.EventScheduler' && c.method === 'create'), 'DSM 7.2 uses .Root only');
   assert.equal(current.calls.find((c) => c.api === 'SYNO.Core.EventScheduler.Root')!.params.SynoConfirmPWToken, 'tok');
   assert.equal(current.step.ztDone, true);
+  for (const hasRoot of [false, true]) {
+    const wrong = run(hasRoot, false);
+    assert.ok(!wrong.calls.some((c) => /EventScheduler/.test(c.api) && c.method !== 'get' && c.method !== 'list'), 'a wrong password creates nothing');
+    assert.notEqual(wrong.step.ztDone, true);
+    assert.match(wrong.messages.join(' '), /\[(3121|400)\]/, 'the rejection shows its code');
+  }
 });
 
 test('firewall rule lives inside the payload, where conf/resource points', () => {

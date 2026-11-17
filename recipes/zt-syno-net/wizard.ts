@@ -168,10 +168,12 @@ export function createTaskScript(lang: Lang, guard: GuardOptions = SPKFORGE_GUAR
     // only have version 1 (104 on version 2) and no .Root API: there the check proves
     // the password and the task is created without a token (see below).
     var confirm = function (version, cb) { request('SYNO.Core.User.PasswordConfirm', 'auth', version, { password: pw }, cb); };
+    // A wrong password fails with a code (3121 on DSM 7.1). Version 1 accepts a good
+    // one with success and no data at all, so the answer is judged by the flag only.
     var after = function (ok, res) {
       pw = '';
-      if (!ok || !res) { fail(${JSON.stringify(t.badPassword)}, res); return; }
-      if (res.SynoConfirmPWToken) { task.SynoConfirmPWToken = res.SynoConfirmPWToken; }
+      if (!ok) { fail(${JSON.stringify(t.badPassword)}, res); return; }
+      if (res && res.SynoConfirmPWToken) { task.SynoConfirmPWToken = res.SynoConfirmPWToken; }
       // DSM answers get/set/run on a task that does not exist with success and no
       // data, so "exists" means "get returned the task", and the result is checked
       // with list at the end instead of trusting the success flags.
